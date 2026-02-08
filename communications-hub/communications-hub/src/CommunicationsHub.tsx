@@ -26,18 +26,42 @@ const MOCK_QUEUE = [
 ];
 const MOCK_CASES = [
   { id: "CS-1001", customerName: "John Smith", unitNumber: "105", phone: "(403) 555-0147", email: "john.smith@email.com", facilityName: "IT Crossing", status: "in-progress", priority: "high", assignedTo: "You", subject: "Access code not working", customerStatus: "active", balance: 0, lastPayment: "Jan 15, 2026", unitType: "10x10 Climate Control", createdAt: "Today 2:10 PM", communications: [
-    { id: "c1", type: "phone", direction: "inbound", timestamp: "Today 2:15 PM", duration: "3m 22s", preview: "Hi, I need help with my access code - it stopped working this morning when I tried to get into my unit.", from: "(403) 555-0147" },
+    { id: "c1", type: "phone", direction: "inbound", timestamp: "Today 2:15 PM", duration: "3m 22s", preview: "Hi, I need help with my access code - it stopped working this morning when I tried to get into my unit.", from: "(403) 555-0147",
+      recordingUrl: "https://api.twilio.com/recordings/RE-mock-recording-001.mp3",
+      aiSummary: "Customer called because his gate access code stopped working this morning. Agent verified the account for Unit 105 and generated a new access code (4821). Customer confirmed he would test it right away.",
+      transcription: [
+        { timestamp: "0:00", speaker: "Agent", text: "Thank you for calling Storage Vault IT Crossing, this is Sarah speaking. How can I help you today?" },
+        { timestamp: "0:05", speaker: "Customer", text: "Hi, I need help with my access code. It stopped working this morning when I tried to get into my unit." },
+        { timestamp: "0:12", speaker: "Agent", text: "I'm sorry to hear that. I can definitely help you with that. Can you please confirm your name and unit number?" },
+        { timestamp: "0:18", speaker: "Customer", text: "Sure, it's John Smith, Unit 105." },
+        { timestamp: "0:22", speaker: "Agent", text: "Thank you, Mr. Smith. Let me pull up your account... I can see your unit here. I'll generate a new access code for you right now." },
+        { timestamp: "0:35", speaker: "Customer", text: "Great, thank you." },
+        { timestamp: "0:45", speaker: "Agent", text: "Alright, your new code is 4821. That's 4-8-2-1. This should work immediately at the gate keypad." },
+        { timestamp: "0:55", speaker: "Customer", text: "4821, got it. Should I try it right now?" },
+        { timestamp: "1:00", speaker: "Agent", text: "Yes, you can test it anytime. It's already active in the system. Is there anything else I can help you with today?" },
+        { timestamp: "1:08", speaker: "Customer", text: "No, that's everything. I'll head over and try it now." },
+        { timestamp: "1:12", speaker: "Agent", text: "Sounds good. If you have any issues, don't hesitate to call back. Have a great day!" },
+        { timestamp: "1:18", speaker: "Customer", text: "Thanks, you too. Bye." },
+      ]
+    },
     { id: "c2", type: "email", direction: "outbound", timestamp: "Today 2:18 PM", preview: "Thanks for calling. Here's your new access code: 4821. This should work immediately at the gate keypad.", subject: "Re: Access Code - Unit 105", from: "support@storagevault.ca" },
     { id: "c3", type: "sms", direction: "inbound", timestamp: "Today 2:45 PM", preview: "Thank you, that helps! The new code worked perfectly.", from: "(403) 555-0147" },
   ], history: [
     { id: "h1", timestamp: "Today 2:10 PM", action: "Case created", details: "Inbound call from customer", user: "System" },
     { id: "h2", timestamp: "Today 2:15 PM", action: "Call answered", details: "Call taken by agent", user: "You" },
     { id: "h3", timestamp: "Today 2:18 PM", action: "Email sent", details: "Re: Access Code - Unit 105", user: "You" },
+  ], suggestedReplies: [
+    { id: "sr1", label: "Confirm resolution", message: "Hi John,\n\nGreat to hear the new code is working! If you have any other issues with your unit or access, don't hesitate to reach out.\n\nBest regards,\nStorage Vault Team", channel: "email" },
+    { id: "sr2", label: "Quick follow-up", message: "Glad the new code worked! Let us know if you need anything else.", channel: "sms" },
   ]},
   { id: "CS-1002", customerName: "Jane Doe", unitNumber: "212", phone: "(403) 555-0283", email: "jane.doe@email.com", facilityName: "IT Crossing", status: "open", priority: "medium", assignedTo: "Unassigned", subject: "Billing inquiry - double charge", customerStatus: "active", balance: 125.0, lastPayment: "Jan 28, 2026", unitType: "5x10 Standard", createdAt: "Today 11:30 AM", communications: [
     { id: "c4", type: "email", direction: "inbound", timestamp: "Today 11:30 AM", preview: "I noticed I was charged twice for February rent. Can you please look into this and issue a refund for the duplicate charge?", subject: "Double Charge on My Account", from: "jane.doe@email.com" },
   ], history: [
     { id: "h4", timestamp: "Today 11:30 AM", action: "Case created", details: "Inbound email from customer", user: "System" },
+  ], suggestedReplies: [
+    { id: "sr3", label: "Acknowledge & investigate", message: "Hi Jane,\n\nThank you for bringing this to our attention. I can see there was a duplicate charge on your account for February rent.\n\nI'm looking into this now and will process a refund for the duplicate amount. You should see the credit back on your card within 3-5 business days.\n\nI apologize for any inconvenience this caused.\n\nBest regards,\nStorage Vault Team", channel: "email" },
+    { id: "sr4", label: "Request transaction details", message: "Hi Jane,\n\nThank you for contacting us. To help investigate the duplicate charge, could you please provide the last 4 digits of the card that was charged and the exact dates/amounts you see?\n\nThis will help me locate the transactions quickly.\n\nThank you,\nStorage Vault Team", channel: "email" },
+    { id: "sr5", label: "Quick acknowledgment", message: "Hi Jane, we received your message about the double charge. Looking into it now and will follow up shortly with details.", channel: "sms" },
   ]},
   { id: "CS-0998", customerName: "Robert Chen", unitNumber: "304", phone: "(403) 555-0391", email: "r.chen@outlook.com", facilityName: "IT Crossing", status: "waiting", priority: "low", assignedTo: "You", subject: "Request for unit transfer", customerStatus: "active", balance: 0, lastPayment: "Feb 1, 2026", unitType: "10x15 Drive-Up", createdAt: "Feb 5", communications: [
     { id: "c5", type: "email", direction: "inbound", timestamp: "Feb 5, 10:15 AM", preview: "I'd like to downsize to a smaller unit. Do you have any 5x10s available? Preferably on the ground floor.", subject: "Unit Transfer Request", from: "r.chen@outlook.com" },
@@ -47,9 +71,33 @@ const MOCK_CASES = [
     { id: "h6", timestamp: "Feb 5, 10:30 AM", action: "Assigned", details: "Assigned to You", user: "System" },
     { id: "h7", timestamp: "Feb 5, 2:30 PM", action: "Email sent", details: "Re: Unit Transfer Request", user: "You" },
     { id: "h8", timestamp: "Feb 5, 2:35 PM", action: "Status changed", details: "Changed to Waiting", user: "You" },
+  ], suggestedReplies: [
+    { id: "sr6", label: "Follow up on transfer", message: "Hi Robert,\n\nJust following up on the unit transfer. The 5x10 ground floor unit (Unit 118) is still available if you'd like to proceed.\n\nLet me know and I can schedule the move for you.\n\nBest regards,\nStorage Vault Team", channel: "email" },
+    { id: "sr7", label: "Quick check-in", message: "Hi Robert, just checking in - are you still interested in transferring to Unit 118? Let me know!", channel: "sms" },
   ]},
   { id: "CS-0995", customerName: "Maria Garcia", unitNumber: "089", phone: "(403) 555-0512", email: "mgarcia@gmail.com", facilityName: "IT Crossing", status: "resolved", priority: "high", assignedTo: "You", subject: "Water leak reported near unit", customerStatus: "active", balance: 0, lastPayment: "Feb 1, 2026", unitType: "10x10 Climate Control", createdAt: "Feb 3", communications: [
-    { id: "c7", type: "phone", direction: "inbound", timestamp: "Feb 3, 9:00 AM", duration: "5m 10s", preview: "There's water pooling in the hallway near my unit. I'm worried it might get inside. Can someone come check?", from: "(403) 555-0512" },
+    { id: "c7", type: "phone", direction: "inbound", timestamp: "Feb 3, 9:00 AM", duration: "5m 10s", preview: "There's water pooling in the hallway near my unit. I'm worried it might get inside. Can someone come check?", from: "(403) 555-0512",
+      recordingUrl: "https://api.twilio.com/recordings/RE-mock-recording-002.mp3",
+      aiSummary: "Customer reported water pooling in the hallway near Unit 089 and was concerned about potential damage to her belongings. Agent marked it as urgent and dispatched maintenance immediately with a 30-minute ETA. Customer was reassured that she would receive updates via text.",
+      transcription: [
+        { timestamp: "0:00", speaker: "Agent", text: "Storage Vault IT Crossing, this is Paul. How can I help you?" },
+        { timestamp: "0:04", speaker: "Customer", text: "Hi, this is Maria Garcia. I'm at the facility right now and there's water pooling in the hallway near my unit. I'm really worried it might get inside." },
+        { timestamp: "0:14", speaker: "Agent", text: "Oh no, I'm sorry to hear that. Let me get your information. You said Maria Garcia — what's your unit number?" },
+        { timestamp: "0:20", speaker: "Customer", text: "Unit 089. It's on the ground floor in Building B." },
+        { timestamp: "0:25", speaker: "Agent", text: "Got it. I'm pulling up your account now. Can you describe how much water we're talking about?" },
+        { timestamp: "0:32", speaker: "Customer", text: "It's like a puddle, maybe two feet wide? It seems to be coming from the ceiling area. I can see it's dripping." },
+        { timestamp: "0:42", speaker: "Agent", text: "Okay, that sounds like it could be a pipe issue. I'm going to mark this as urgent and dispatch our maintenance team right away." },
+        { timestamp: "0:50", speaker: "Customer", text: "Thank you. How long do you think it will take? I have some important documents in there." },
+        { timestamp: "0:58", speaker: "Agent", text: "I completely understand your concern. Our maintenance team should be there within 30 minutes. I'll also send you a text with updates." },
+        { timestamp: "1:08", speaker: "Customer", text: "Okay, that would be great. Should I wait here or..." },
+        { timestamp: "1:12", speaker: "Agent", text: "You don't have to wait if you don't want to. We'll inspect your unit and text you with what we find. If there's any damage, we'll document everything." },
+        { timestamp: "1:22", speaker: "Customer", text: "Alright, I'll wait for a bit and see if they arrive. Thank you for taking this seriously." },
+        { timestamp: "1:28", speaker: "Agent", text: "Of course, Ms. Garcia. We take these situations very seriously. You'll get a text shortly confirming maintenance is on the way. Is there anything else?" },
+        { timestamp: "1:38", speaker: "Customer", text: "No, that's all. I just want to make sure my stuff is safe." },
+        { timestamp: "1:42", speaker: "Agent", text: "Absolutely. We'll take care of it. You'll hear from us soon." },
+        { timestamp: "1:46", speaker: "Customer", text: "Thank you so much. Bye." },
+      ]
+    },
     { id: "c8", type: "sms", direction: "outbound", timestamp: "Feb 3, 9:15 AM", preview: "Hi Maria, maintenance is on the way now. We'll inspect your unit and the hallway. ETA 30 minutes.", from: "support@storagevault.ca" },
     { id: "c9", type: "sms", direction: "outbound", timestamp: "Feb 3, 10:45 AM", preview: "Update: The leak was from a pipe fitting above the hallway. Fixed now. Your unit was not affected - no water inside. All clear!", from: "support@storagevault.ca" },
     { id: "c10", type: "sms", direction: "inbound", timestamp: "Feb 3, 11:00 AM", preview: "Thank you so much for the fast response! Really appreciate it.", from: "(403) 555-0512" },
@@ -59,6 +107,9 @@ const MOCK_CASES = [
     { id: "h11", timestamp: "Feb 3, 9:15 AM", action: "SMS sent", details: "Maintenance on the way", user: "You" },
     { id: "h12", timestamp: "Feb 3, 10:45 AM", action: "SMS sent", details: "Issue resolved update", user: "You" },
     { id: "h13", timestamp: "Feb 3, 11:15 AM", action: "Status changed", details: "Marked as Resolved", user: "You" },
+  ], suggestedReplies: [
+    { id: "sr8", label: "Thank you follow-up", message: "Hi Maria,\n\nThank you for your kind words! We're glad we could resolve the issue quickly. Your belongings' safety is our top priority.\n\nIf you ever notice anything unusual at the facility, please don't hesitate to contact us.\n\nBest regards,\nStorage Vault Team", channel: "email" },
+    { id: "sr9", label: "Request feedback", message: "Hi Maria, thanks again for letting us know about the leak. If you have a moment, we'd love to hear your feedback on how we handled the situation. Reply to this message or call us anytime!", channel: "sms" },
   ]},
 ];
 function formatWaitTime(seconds: number) { const m = Math.floor(seconds / 60); const s = seconds % 60; return m + "m " + s.toString().padStart(2, "0") + "s"; }
@@ -69,7 +120,200 @@ function Badge({ children, color, bg }: { children: React.ReactNode; color: stri
 function TabButton({ active, count, children, onClick }: { active: boolean; count?: number; children: React.ReactNode; onClick: () => void }) { return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: active ? 600 : 500, color: active ? "#fff" : "#64748B", backgroundColor: active ? "#0F172A" : "transparent", border: active ? "none" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease", whiteSpace: "nowrap" }}>{children}{count !== undefined && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700, color: active ? "#0F172A" : "#fff", backgroundColor: active ? "#fff" : "#94A3B8", padding: "0 5px" }}>{count}</span>}</button>; }
 function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selected: boolean; onClick: () => void; onTakeCall: () => void }) { const priority = getPriorityConfig(item.priority); const isUnknown = !item.customerName; return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : "#fff", border: selected ? "2px solid #0F172A" : "1px solid #E2E8F0", transition: "all 0.15s ease", position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", backgroundColor: priority.color, borderRadius: "10px 0 0 10px" }} /><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}><div><div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>{isUnknown && <span style={{ color: "#F59E0B", fontSize: "14px" }}>&#9888;</span>}{item.customerName || "Unknown Caller"}</div>{item.unitNumber ? <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>Unit {item.unitNumber} &middot; {item.facilityName}</div> : <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>{item.phoneNumber}</div>}</div><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}><div style={{ fontSize: "12px", color: item.waitTime > 180 ? "#EF4444" : "#64748B", fontWeight: item.waitTime > 180 ? 600 : 400, display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "14px" }}>&#9201;</span>{formatWaitTime(item.waitTime)}{item.waitTime > 180 && " \u2014 long wait"}</div><button onClick={(e) => { e.stopPropagation(); onTakeCall(); }} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#fff", backgroundColor: "#10B981", border: "none", cursor: "pointer" }}>Take Call</button></div></div>; }
 function CaseCard({ caseData, selected, onClick }: { caseData: any; selected: boolean; onClick: () => void }) { const status = getStatusConfig(caseData.status); const priority = getPriorityConfig(caseData.priority); const latestComm = caseData.communications[caseData.communications.length - 1]; const commType = getCommTypeConfig(latestComm?.type); return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : "#fff", border: selected ? "2px solid #0F172A" : "1px solid #E2E8F0", transition: "all 0.15s ease" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}><div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A" }}>{caseData.customerName}</div><Badge color={status.color} bg={status.bg}>{status.label}</Badge></div><div style={{ fontSize: "12px", color: "#64748B", marginBottom: "6px" }}>{caseData.id} &middot; Unit {caseData.unitNumber} &middot; {caseData.facilityName}</div><div style={{ fontSize: "13px", color: "#334155", marginBottom: "8px", fontWeight: 500 }}>{caseData.subject}</div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748B" }}><span>{commType.icon}</span><span>{latestComm?.direction === "inbound" ? "From" : "Sent"} &middot; {latestComm?.timestamp}</span></div><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div></div>; }
-function CommunicationItem({ comm, isFirst }: { comm: any; isFirst: boolean }) { const config = getCommTypeConfig(comm.type); return <div style={{ display: "flex", gap: "12px" }}><div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "32px", flexShrink: 0 }}>{!isFirst && <div style={{ width: "2px", height: "12px", backgroundColor: "#E2E8F0" }} />}<div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: config.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{config.icon}</div><div style={{ width: "2px", flex: 1, backgroundColor: "#E2E8F0", minHeight: "12px" }} /></div><div style={{ flex: 1, padding: "8px 14px 16px" }}><div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}><span style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{config.label}</span><Badge color={comm.direction === "inbound" ? "#3B82F6" : "#10B981"} bg={comm.direction === "inbound" ? "#EFF6FF" : "#ECFDF5"}>{comm.direction}</Badge><span style={{ fontSize: "12px", color: "#94A3B8" }}>{comm.timestamp}</span>{comm.duration && <span style={{ fontSize: "12px", color: "#94A3B8" }}>&middot; {comm.duration}</span>}</div><div style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", backgroundColor: "#F8FAFC", borderRadius: "8px", padding: "10px 12px", border: "1px solid #F1F5F9" }}>{comm.preview}</div></div></div>; }
+function AudioPlayer({ recordingUrl, duration }: { recordingUrl: string; duration?: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState("0:00");
+
+  // Parse duration string like "3m 22s" to total seconds
+  const parseDuration = (dur?: string): number => {
+    if (!dur) return 180; // default 3 min
+    const match = dur.match(/(\d+)m\s*(\d+)s/);
+    if (match) return parseInt(match[1]) * 60 + parseInt(match[2]);
+    return 180;
+  };
+
+  const totalSeconds = parseDuration(duration);
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Simulate playback for demo
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        const newProgress = p + (100 / totalSeconds);
+        if (newProgress >= 100) {
+          setIsPlaying(false);
+          setCurrentTime(formatTime(totalSeconds));
+          return 100;
+        }
+        setCurrentTime(formatTime((newProgress / 100) * totalSeconds));
+        return newProgress;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isPlaying, totalSeconds]);
+
+  const handlePlayPause = () => {
+    if (progress >= 100) {
+      setProgress(0);
+      setCurrentTime("0:00");
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const newProgress = (clickX / rect.width) * 100;
+    setProgress(newProgress);
+    setCurrentTime(formatTime((newProgress / 100) * totalSeconds));
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", backgroundColor: "#F8FAFC", borderRadius: "6px", border: "1px solid #E2E8F0", marginTop: "8px" }}>
+      <button
+        onClick={handlePlayPause}
+        style={{ width: "28px", height: "28px", borderRadius: "50%", border: "none", backgroundColor: "#3B82F6", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink: 0 }}
+      >
+        {isPlaying ? "❚❚" : "▶"}
+      </button>
+      <div
+        onClick={handleProgressClick}
+        style={{ flex: 1, height: "6px", backgroundColor: "#E2E8F0", borderRadius: "3px", cursor: "pointer", position: "relative" }}
+      >
+        <div style={{ width: `${progress}%`, height: "100%", backgroundColor: "#3B82F6", borderRadius: "3px", transition: "width 0.1s ease" }} />
+      </div>
+      <span style={{ fontSize: "11px", color: "#64748B", fontVariantNumeric: "tabular-nums", minWidth: "70px" }}>
+        {currentTime} / {formatTime(totalSeconds)}
+      </span>
+      <a
+        href={recordingUrl}
+        download
+        onClick={(e) => e.stopPropagation()}
+        style={{ fontSize: "11px", color: "#3B82F6", textDecoration: "none", whiteSpace: "nowrap" }}
+      >
+        Download
+      </a>
+    </div>
+  );
+}
+
+function TranscriptSection({ transcription }: { transcription: Array<{ timestamp: string; speaker: string; text: string }> }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const text = transcription.map((line) => `[${line.timestamp}] ${line.speaker}: ${line.text}`).join("\n");
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ marginTop: "8px" }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{ background: "none", border: "none", padding: 0, fontSize: "12px", color: "#3B82F6", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+      >
+        <span style={{ transition: "transform 0.15s", transform: expanded ? "rotate(90deg)" : "rotate(0deg)", display: "inline-block" }}>▶</span>
+        {expanded ? "Hide Transcript" : "Show Transcript"}
+      </button>
+      {expanded && (
+        <div style={{ marginTop: "8px", backgroundColor: "#F8FAFC", borderRadius: "8px", border: "1px solid #E2E8F0", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderBottom: "1px solid #E2E8F0", backgroundColor: "#F1F5F9" }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em" }}>Transcript</span>
+            <button
+              onClick={handleCopy}
+              style={{ background: "none", border: "1px solid #E2E8F0", borderRadius: "4px", padding: "4px 8px", fontSize: "11px", color: copied ? "#10B981" : "#64748B", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+            >
+              {copied ? "✓ Copied" : "Copy"}
+            </button>
+          </div>
+          <div style={{ maxHeight: "240px", overflow: "auto", padding: "12px" }}>
+            {transcription.map((line, i) => (
+              <div key={i} style={{ marginBottom: "8px", fontSize: "12px", lineHeight: "1.5", fontFamily: "'SF Mono', 'Menlo', 'Monaco', monospace" }}>
+                <span style={{ color: "#94A3B8", marginRight: "8px" }}>[{line.timestamp}]</span>
+                <span style={{ color: line.speaker === "Agent" ? "#3B82F6" : "#0F172A", fontWeight: 500 }}>{line.speaker}:</span>
+                <span style={{ color: "#475569", marginLeft: "4px" }}>{line.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AISummary({ summary }: { summary: string }) {
+  const [regenerating, setRegenerating] = useState(false);
+
+  const handleRegenerate = () => {
+    setRegenerating(true);
+    // Mock regeneration - just show spinner for 1.5s then same text
+    setTimeout(() => setRegenerating(false), 1500);
+  };
+
+  return (
+    <div style={{ marginTop: "8px", padding: "12px", backgroundColor: "#F5F3FF", borderRadius: "8px", border: "1px solid #E9D5FF" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 600, color: "#6366F1", display: "flex", alignItems: "center", gap: "4px" }}>
+          <span>✨</span> AI Summary
+        </span>
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          style={{ background: "none", border: "1px solid #E9D5FF", borderRadius: "4px", padding: "3px 8px", fontSize: "10px", color: "#6366F1", cursor: regenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "4px" }}
+        >
+          {regenerating ? (
+            <>
+              <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>↻</span>
+              Regenerating...
+            </>
+          ) : (
+            "Regenerate"
+          )}
+        </button>
+      </div>
+      <p style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", margin: 0 }}>
+        {regenerating ? <span style={{ color: "#94A3B8" }}>Generating summary...</span> : summary}
+      </p>
+    </div>
+  );
+}
+
+function CommunicationItem({ comm, isFirst }: { comm: any; isFirst: boolean }) {
+  const config = getCommTypeConfig(comm.type);
+  const hasRecording = comm.type === "phone" && comm.recordingUrl;
+  const hasTranscript = comm.type === "phone" && comm.transcription && comm.transcription.length > 0;
+  const hasAISummary = comm.type === "phone" && comm.aiSummary;
+
+  return (
+    <div style={{ display: "flex", gap: "12px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "32px", flexShrink: 0 }}>
+        {!isFirst && <div style={{ width: "2px", height: "12px", backgroundColor: "#E2E8F0" }} />}
+        <div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: config.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{config.icon}</div>
+        <div style={{ width: "2px", flex: 1, backgroundColor: "#E2E8F0", minHeight: "12px" }} />
+      </div>
+      <div style={{ flex: 1, padding: "8px 14px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{config.label}</span>
+          <Badge color={comm.direction === "inbound" ? "#3B82F6" : "#10B981"} bg={comm.direction === "inbound" ? "#EFF6FF" : "#ECFDF5"}>{comm.direction}</Badge>
+          <span style={{ fontSize: "12px", color: "#94A3B8" }}>{comm.timestamp}</span>
+          {comm.duration && <span style={{ fontSize: "12px", color: "#94A3B8" }}>&middot; {comm.duration}</span>}
+        </div>
+        <div style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", backgroundColor: "#F8FAFC", borderRadius: "8px", padding: "10px 12px", border: "1px solid #F1F5F9" }}>{comm.preview}</div>
+        {hasRecording && <AudioPlayer recordingUrl={comm.recordingUrl} duration={comm.duration} />}
+        {hasAISummary && <AISummary summary={comm.aiSummary} />}
+        {hasTranscript && <TranscriptSection transcription={comm.transcription} />}
+      </div>
+    </div>
+  );
+}
 function applyTemplate(text: string, caseData: any) {
   return text
     .replace(/\{\{name\}\}/g, caseData?.customerName?.split(" ")[0] || "there")
@@ -79,10 +323,10 @@ function applyTemplate(text: string, caseData: any) {
     .replace(/\{\{balance\}\}/g, caseData?.balance ? `$${caseData.balance.toFixed(2)}` : "$0.00")
     .replace(/\{\{phone\}\}/g, caseData?.phone || "");
 }
-function SendEmailModal({ caseData, onClose, onSend }: { caseData: any; onClose: () => void; onSend: (email: { to: string; subject: string; body: string }) => void }) {
+function SendEmailModal({ caseData, prefilledBody, onClose, onSend }: { caseData: any; prefilledBody?: string; onClose: () => void; onSend: (email: { to: string; subject: string; body: string }) => void }) {
   const [to, setTo] = useState(caseData?.email || "");
   const [subject, setSubject] = useState(caseData?.subject ? `Re: ${caseData.subject}` : "");
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(prefilledBody || "");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
@@ -136,9 +380,9 @@ function SendEmailModal({ caseData, onClose, onSend }: { caseData: any; onClose:
     </div>
   </div>;
 }
-function SendSMSModal({ caseData, onClose, onSend }: { caseData: any; onClose: () => void; onSend: (sms: { to: string; message: string }) => void }) {
+function SendSMSModal({ caseData, prefilledMessage, onClose, onSend }: { caseData: any; prefilledMessage?: string; onClose: () => void; onSend: (sms: { to: string; message: string }) => void }) {
   const [to, setTo] = useState(caseData?.phone || "");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(prefilledMessage || "");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplate(templateId);
@@ -281,11 +525,48 @@ function HistoryItem({ entry }: { entry: any }) {
     </div>
   </div>;
 }
-function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onAssign, onUpdateSubject, onUpdatePriority, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; onAssign?: (caseId: string, agent: string) => void; onUpdateSubject?: (caseId: string, subject: string) => void; onUpdatePriority?: (caseId: string, priority: string) => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
+function SuggestedReplies({ suggestions, onSelect, onDismiss }: { suggestions: Array<{ id: string; label: string; message: string; channel: 'email' | 'sms' }>; onSelect: (suggestion: any) => void; onDismiss: () => void }) {
+  return (
+    <div style={{ padding: "12px 24px", borderTop: "1px solid #F1F5F9", backgroundColor: "#FAFAFA" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "#6366F1", display: "flex", alignItems: "center", gap: "4px" }}>
+          <span>✨</span> Suggested Replies
+        </span>
+        <button onClick={onDismiss} style={{ background: "none", border: "none", fontSize: "11px", color: "#94A3B8", cursor: "pointer", padding: "2px 6px" }}>
+          Dismiss
+        </button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {suggestions.map((suggestion) => (
+          <div
+            key={suggestion.id}
+            onClick={() => onSelect(suggestion)}
+            style={{ padding: "10px 12px", backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease" }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#6366F1"; e.currentTarget.style.backgroundColor = "#F5F3FF"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.backgroundColor = "#fff"; }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#0F172A" }}>{suggestion.label}</span>
+              <Badge color={suggestion.channel === "email" ? "#10B981" : "#8B5CF6"} bg={suggestion.channel === "email" ? "#ECFDF5" : "#F5F3FF"}>
+                {suggestion.channel}
+              </Badge>
+            </div>
+            <p style={{ fontSize: "12px", color: "#64748B", margin: 0, lineHeight: "1.4", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+              {suggestion.message.split("\n")[0]}...
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onSuggestedReply, onAssign, onUpdateSubject, onUpdatePriority, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; onSuggestedReply?: (suggestion: { message: string; channel: 'email' | 'sms' }) => void; onAssign?: (caseId: string, agent: string) => void; onUpdateSubject?: (caseId: string, subject: string) => void; onUpdatePriority?: (caseId: string, priority: string) => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
   const [editingSubject, setEditingSubject] = useState(false);
   const [subjectDraft, setSubjectDraft] = useState("");
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
 
   if (caseData && activeCallCaseId === caseData.id && callStartTime && onEndCall) {
     return <ActiveCallView caseData={caseData} callStartTime={callStartTime} onEndCall={onEndCall} />;
@@ -426,6 +707,13 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onA
         </div>
       )}
     </div>
+    {caseData.suggestedReplies && caseData.suggestedReplies.length > 0 && !suggestionsDismissed && (
+      <SuggestedReplies
+        suggestions={caseData.suggestedReplies}
+        onSelect={(suggestion) => onSuggestedReply?.(suggestion)}
+        onDismiss={() => setSuggestionsDismissed(true)}
+      />
+    )}
     <div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: "8px", flexWrap: "wrap" }}>
       <button onClick={onSendEmail} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#10B981", backgroundColor: "transparent", border: "1px solid #10B981" }}><span style={{ fontSize: "14px" }}>{"\u2709\uFE0F"}</span>Send Email</button>
       <button onClick={onSendSms} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#8B5CF6", backgroundColor: "transparent", border: "1px solid #8B5CF6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4AC}"}</span>Send SMS</button>
@@ -443,6 +731,7 @@ export default function CommunicationsHub() {
   const [nextCaseNum, setNextCaseNum] = useState(1003);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
+  const [prefilledMessage, setPrefilledMessage] = useState("");
   const [activeCallCaseId, setActiveCallCaseId] = useState<string | null>(null);
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -633,10 +922,10 @@ export default function CommunicationsHub() {
           {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => setSelectedId(c.id)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
         </div>
       </div>
-      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => setShowEmailModal(true)} onSendSms={() => setShowSmsModal(true)} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
+      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => { setPrefilledMessage(""); setShowEmailModal(true); }} onSendSms={() => { setPrefilledMessage(""); setShowSmsModal(true); }} onSuggestedReply={(suggestion) => { setPrefilledMessage(suggestion.message); if (suggestion.channel === "email") setShowEmailModal(true); else setShowSmsModal(true); }} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
     </div>
-    {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} onClose={() => setShowEmailModal(false)} onSend={handleSendEmail} />}
-    {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} onClose={() => setShowSmsModal(false)} onSend={handleSendSms} />}
-    <style>{"@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }"}</style>
+    {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} prefilledBody={prefilledMessage} onClose={() => { setShowEmailModal(false); setPrefilledMessage(""); }} onSend={handleSendEmail} />}
+    {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} prefilledMessage={prefilledMessage} onClose={() => { setShowSmsModal(false); setPrefilledMessage(""); }} onSend={handleSendSms} />}
+    <style>{"@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
   </div>;
 }
