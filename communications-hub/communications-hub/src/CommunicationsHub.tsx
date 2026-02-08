@@ -116,6 +116,41 @@ function formatWaitTime(seconds: number) { const m = Math.floor(seconds / 60); c
 function getPriorityConfig(priority: string) { const c: Record<string, any> = { urgent: { color: "#EF4444", bg: "#FEF2F2", label: "Urgent" }, high: { color: "#F59E0B", bg: "#FFFBEB", label: "High" }, medium: { color: "#3B82F6", bg: "#EFF6FF", label: "Medium" }, low: { color: "#6B7280", bg: "#F9FAFB", label: "Low" } }; return c[priority] || c.low; }
 function getStatusConfig(status: string) { const c: Record<string, any> = { open: { color: "#3B82F6", bg: "#EFF6FF", label: "Open" }, "in-progress": { color: "#F59E0B", bg: "#FFFBEB", label: "In Progress" }, waiting: { color: "#FB923C", bg: "#FFF7ED", label: "Waiting" }, resolved: { color: "#10B981", bg: "#ECFDF5", label: "Resolved" }, closed: { color: "#6B7280", bg: "#F9FAFB", label: "Closed" } }; return c[status] || c.open; }
 function getCommTypeConfig(type: string) { const c: Record<string, any> = { phone: { color: "#3B82F6", bg: "#EFF6FF", icon: "\u{1F4DE}", label: "Phone" }, email: { color: "#10B981", bg: "#ECFDF5", icon: "\u2709\uFE0F", label: "Email" }, sms: { color: "#8B5CF6", bg: "#F5F3FF", icon: "\u{1F4AC}", label: "SMS" } }; return c[type] || c.phone; }
+function getRecommendedEmailTemplate(caseData: any): { id: string; reason: string } | null {
+  const subject = (caseData?.subject || "").toLowerCase();
+  if (subject.includes("access") || subject.includes("code") || subject.includes("gate")) {
+    return { id: "access-code", reason: "This case is about access code issues" };
+  }
+  if (subject.includes("billing") || subject.includes("charge") || subject.includes("payment") || subject.includes("refund")) {
+    return { id: "payment-reminder", reason: "This case involves billing or payment" };
+  }
+  if (subject.includes("transfer") || subject.includes("move") || subject.includes("downsize") || subject.includes("upgrade")) {
+    return { id: "unit-transfer", reason: "This case is about unit transfers" };
+  }
+  if (subject.includes("maintenance") || subject.includes("leak") || subject.includes("repair") || subject.includes("broken")) {
+    return { id: "maintenance-update", reason: "This case involves maintenance issues" };
+  }
+  if (caseData?.status === "resolved" || caseData?.status === "waiting") {
+    return { id: "follow-up", reason: "Good time to follow up on this case" };
+  }
+  return null;
+}
+function getRecommendedSmsTemplate(caseData: any): { id: string; reason: string } | null {
+  const subject = (caseData?.subject || "").toLowerCase();
+  if (subject.includes("access") || subject.includes("code") || subject.includes("gate")) {
+    return { id: "access-code", reason: "This case is about access code issues" };
+  }
+  if (subject.includes("billing") || subject.includes("charge") || subject.includes("payment")) {
+    return { id: "payment-reminder", reason: "This case involves billing" };
+  }
+  if (subject.includes("maintenance") || subject.includes("leak") || subject.includes("repair")) {
+    return { id: "maintenance-complete", reason: "Send maintenance status update" };
+  }
+  if (caseData?.status === "resolved" || caseData?.status === "waiting") {
+    return { id: "follow-up", reason: "Good time for a quick check-in" };
+  }
+  return null;
+}
 function Badge({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) { return <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: "9999px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.025em", color, backgroundColor: bg, textTransform: "uppercase" }}>{children}</span>; }
 function TabButton({ active, count, children, onClick }: { active: boolean; count?: number; children: React.ReactNode; onClick: () => void }) { return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: active ? 600 : 500, color: active ? "#fff" : "#64748B", backgroundColor: active ? "#0F172A" : "transparent", border: active ? "none" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease", whiteSpace: "nowrap" }}>{children}{count !== undefined && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700, color: active ? "#0F172A" : "#fff", backgroundColor: active ? "#fff" : "#94A3B8", padding: "0 5px" }}>{count}</span>}</button>; }
 function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selected: boolean; onClick: () => void; onTakeCall: () => void }) { const priority = getPriorityConfig(item.priority); const isUnknown = !item.customerName; return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : "#fff", border: selected ? "2px solid #0F172A" : "1px solid #E2E8F0", transition: "all 0.15s ease", position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", backgroundColor: priority.color, borderRadius: "10px 0 0 10px" }} /><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}><div><div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>{isUnknown && <span style={{ color: "#F59E0B", fontSize: "14px" }}>&#9888;</span>}{item.customerName || "Unknown Caller"}</div>{item.unitNumber ? <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>Unit {item.unitNumber} &middot; {item.facilityName}</div> : <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>{item.phoneNumber}</div>}</div><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}><div style={{ fontSize: "12px", color: item.waitTime > 180 ? "#EF4444" : "#64748B", fontWeight: item.waitTime > 180 ? 600 : 400, display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "14px" }}>&#9201;</span>{formatWaitTime(item.waitTime)}{item.waitTime > 180 && " \u2014 long wait"}</div><button onClick={(e) => { e.stopPropagation(); onTakeCall(); }} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#fff", backgroundColor: "#10B981", border: "none", cursor: "pointer" }}>Take Call</button></div></div>; }
@@ -355,10 +390,32 @@ function SendEmailModal({ caseData, prefilledBody, onClose, onSend }: { caseData
       <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px", maxHeight: "60vh", overflow: "auto" }}>
         <div>
           <label style={labelStyle}>Template</label>
-          <select value={selectedTemplate} onChange={(e) => handleTemplateChange(e.target.value)} style={{ ...inputStyle, cursor: "pointer", backgroundColor: "#fff" }}>
-            <option value="">Select a template (optional)</option>
-            {EMAIL_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          {(() => {
+            const recommended = getRecommendedEmailTemplate(caseData);
+            const recommendedTemplate = recommended ? EMAIL_TEMPLATES.find(t => t.id === recommended.id) : null;
+            const otherTemplates = recommended ? EMAIL_TEMPLATES.filter(t => t.id !== recommended.id) : EMAIL_TEMPLATES;
+            return (
+              <>
+                {recommended && recommendedTemplate && (
+                  <div
+                    onClick={() => handleTemplateChange(recommended.id)}
+                    style={{ marginBottom: "8px", padding: "10px 12px", backgroundColor: selectedTemplate === recommended.id ? "#F5F3FF" : "#FAFAFA", borderRadius: "8px", border: selectedTemplate === recommended.id ? "2px solid #6366F1" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "12px", color: "#6366F1", fontWeight: 600 }}>✨ Recommended</span>
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{recommendedTemplate.name}</span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#64748B" }}>{recommended.reason}</div>
+                  </div>
+                )}
+                <select value={selectedTemplate} onChange={(e) => handleTemplateChange(e.target.value)} style={{ ...inputStyle, cursor: "pointer", backgroundColor: "#fff" }}>
+                  <option value="">Select a template (optional)</option>
+                  {recommended && <option value={recommended.id}>✨ {EMAIL_TEMPLATES.find(t => t.id === recommended.id)?.name} (Recommended)</option>}
+                  {otherTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </>
+            );
+          })()}
         </div>
         <div>
           <label style={labelStyle}>To</label>
@@ -412,10 +469,32 @@ function SendSMSModal({ caseData, prefilledMessage, onClose, onSend }: { caseDat
       <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <div>
           <label style={labelStyle}>Template</label>
-          <select value={selectedTemplate} onChange={(e) => handleTemplateChange(e.target.value)} style={{ ...inputStyle, cursor: "pointer", backgroundColor: "#fff" }}>
-            <option value="">Select a template (optional)</option>
-            {SMS_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+          {(() => {
+            const recommended = getRecommendedSmsTemplate(caseData);
+            const recommendedTemplate = recommended ? SMS_TEMPLATES.find(t => t.id === recommended.id) : null;
+            const otherTemplates = recommended ? SMS_TEMPLATES.filter(t => t.id !== recommended.id) : SMS_TEMPLATES;
+            return (
+              <>
+                {recommended && recommendedTemplate && (
+                  <div
+                    onClick={() => handleTemplateChange(recommended.id)}
+                    style={{ marginBottom: "8px", padding: "10px 12px", backgroundColor: selectedTemplate === recommended.id ? "#F5F3FF" : "#FAFAFA", borderRadius: "8px", border: selectedTemplate === recommended.id ? "2px solid #6366F1" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "12px", color: "#6366F1", fontWeight: 600 }}>✨ Recommended</span>
+                      <span style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{recommendedTemplate.name}</span>
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#64748B" }}>{recommended.reason}</div>
+                  </div>
+                )}
+                <select value={selectedTemplate} onChange={(e) => handleTemplateChange(e.target.value)} style={{ ...inputStyle, cursor: "pointer", backgroundColor: "#fff" }}>
+                  <option value="">Select a template (optional)</option>
+                  {recommended && <option value={recommended.id}>✨ {SMS_TEMPLATES.find(t => t.id === recommended.id)?.name} (Recommended)</option>}
+                  {otherTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </>
+            );
+          })()}
         </div>
         <div>
           <label style={labelStyle}>To</label>
