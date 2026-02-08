@@ -1,6 +1,6 @@
 # ManageSpace - Master Context Document
 
-**Last Updated:** February 8, 2026 (afternoon session — AI Assist Layer complete)
+**Last Updated:** February 8, 2026 (evening session — Gap analysis added)
 **Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
 **Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
@@ -19,7 +19,7 @@
 ### What It Is
 A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use it to manage inbound calls, emails, and SMS from storage tenants. Paul is building the backend (Twilio integration), Cory is building the frontend.
 
-### Current State (as of Feb 8, afternoon)
+### Current State (as of Feb 8, evening)
 
 **Working — Core UI:**
 - ✅ React + TypeScript + Vite project running
@@ -132,6 +132,67 @@ Add AI-powered intelligence to the helpdesk that makes human agents faster and b
 - Brief explanation: "Based on this case, we suggest the Access Code Reset template"
 - Rest of templates still available below
 **Mock data:** Based on case subject/type, hardcode which template gets the "recommended" badge.
+
+---
+
+## STORAGE VAULT GAP ANALYSIS (Feb 8, 2026)
+
+Based on review of Storage Vault's detailed requirements spec, here's what we've built vs. what's missing:
+
+### ✅ FULLY COVERED
+- Inbound phone call handling (queue → take call → active call view → end call)
+- SMS in timeline (inbound + outbound)
+- Email in timeline (inbound + outbound)
+- Outbound SMS modal with templates
+- Outbound email modal with templates
+- Case management (create, assign, status changes, history)
+- AI Assist Layer (recordings, transcripts, summaries, suggested replies)
+
+### ⚠️ PARTIALLY COVERED
+| Feature | What We Have | What's Missing |
+|---------|--------------|----------------|
+| Skills-based routing | Cases have priority, assignee | No visible "Skills" labels on queue items or agents |
+| Real-time notifications | Pulsing "3 in queue" badge | No toast notifications for new calls/emails arriving |
+| Case matching | Take Call creates new case | No logic to match inbound to existing open case for same customer |
+
+### ❌ NOT COVERED
+| Feature | Impact | Priority |
+|---------|--------|----------|
+| **Missed Call handling** | Calls that ring out need to appear as missed with callback option | 🔴 Must have |
+| **Outbound Call button** | Agents can't initiate calls, only receive them | 🔴 Must have |
+| **Automated/System comms** | No way to show auto-sent emails (receipts, reminders) in timeline | 🟡 Should have |
+| **SLA indicators** | No visible response time targets or overdue warnings on cases | 🟡 Should have |
+| **Live Chat channel** | Spec mentions live chat but we only have phone/email/SMS | 🟢 Can wait |
+| **Reporting dashboard** | No analytics or performance metrics view | 🟢 Can wait |
+| **Agent performance** | No call duration averages, resolution rates, etc. | 🟢 Can wait |
+
+### PRIORITY FOR NEXT BUILD SESSION
+
+**1. Missed Call Handling (🔴 Must Have)**
+- Add new queue item type: `status: 'missed'`
+- Red badge/indicator for missed calls
+- "Call Back" button instead of "Take Call"
+- Missed calls show in timeline as "Missed call from..."
+
+**2. Outbound Call Button (🔴 Must Have)**
+- Add "📞 Call" button next to Send Email / Send SMS
+- Opens Active Call View with outbound indicator
+- Mock: shows dialing state → connected → same call UI
+
+**3. Real-time Notification Toast (🟡 Should Have)**
+- Toast notification when new call/email/SMS arrives
+- "New call from John Smith" with Accept/Dismiss
+- Subtle animation, auto-dismiss after 5 seconds
+
+**4. Automated/System Communications (🟡 Should Have)**
+- Add `source: 'automated' | 'agent'` to Communication type
+- System messages show with robot/gear icon
+- Examples: "Payment receipt sent", "Access code auto-generated"
+
+**5. SLA Indicators (🟡 Nice to Have)**
+- Add `responseDeadline` to Case type
+- Yellow warning when approaching deadline
+- Red "OVERDUE" badge when past deadline
 
 ---
 
@@ -318,17 +379,23 @@ When Cory opens Claude Code in Cursor terminal:
 6. **Test in browser** — Vite hot-reloads
 
 ### Current Priority
-**ALL FEATURES COMPLETE — DEMO READY!**
+**CORE FEATURES COMPLETE — CLOSING SPEC GAPS**
 
-The Communications Hub is ready to demo to Storage Vault with:
+The Communications Hub has solid core functionality. Next up: close gaps from Storage Vault spec review.
+
+**What's working:**
 - Full helpdesk inbox UI (queue, cases, detail panel)
 - Call recordings with audio player
 - Call transcripts with speaker labels
-- AI call summaries
-- AI suggested replies
-- Smart template recommendations
+- AI call summaries, suggested replies, smart templates
 
-**Next:** Connect to Paul's backend when real Twilio/API integration is ready.
+**Next to build (see Gap Analysis section):**
+1. 🔴 Missed Call handling (missed calls in queue + callback button)
+2. 🔴 Outbound Call button (agents initiate calls)
+3. 🟡 Real-time notification toast
+4. 🟡 Automated/System communications in timeline
+
+**After gaps closed:** Connect to Paul's backend for real Twilio integration.
 
 ### Build Philosophy
 - Ship working features fast
