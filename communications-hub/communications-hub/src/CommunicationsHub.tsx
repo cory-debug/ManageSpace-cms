@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+const AGENTS = ["You", "Sarah M.", "Paul B.", "Unassigned"];
+
 const EMAIL_TEMPLATES = [
   { id: "access-code", name: "Access Code Reset", subject: "Your New Access Code - Unit {{unit}}", body: "Hi {{name}},\n\nYour new access code is: [CODE]\n\nThis code is active immediately and will work at the gate keypad. Please keep this code secure and do not share it with others.\n\nIf you have any issues, please don't hesitate to contact us.\n\nBest regards,\nStorage Vault Team" },
   { id: "payment-reminder", name: "Payment Reminder", subject: "Payment Reminder - Unit {{unit}}", body: "Hi {{name}},\n\nThis is a friendly reminder that your account has an outstanding balance of {{balance}}.\n\nTo avoid any late fees or service interruptions, please make a payment at your earliest convenience. You can pay online through your tenant portal or by calling our office.\n\nIf you've already made this payment, please disregard this message.\n\nThank you,\nStorage Vault Team" },
@@ -27,19 +29,36 @@ const MOCK_CASES = [
     { id: "c1", type: "phone", direction: "inbound", timestamp: "Today 2:15 PM", duration: "3m 22s", preview: "Hi, I need help with my access code - it stopped working this morning when I tried to get into my unit.", from: "(403) 555-0147" },
     { id: "c2", type: "email", direction: "outbound", timestamp: "Today 2:18 PM", preview: "Thanks for calling. Here's your new access code: 4821. This should work immediately at the gate keypad.", subject: "Re: Access Code - Unit 105", from: "support@storagevault.ca" },
     { id: "c3", type: "sms", direction: "inbound", timestamp: "Today 2:45 PM", preview: "Thank you, that helps! The new code worked perfectly.", from: "(403) 555-0147" },
+  ], history: [
+    { id: "h1", timestamp: "Today 2:10 PM", action: "Case created", details: "Inbound call from customer", user: "System" },
+    { id: "h2", timestamp: "Today 2:15 PM", action: "Call answered", details: "Call taken by agent", user: "You" },
+    { id: "h3", timestamp: "Today 2:18 PM", action: "Email sent", details: "Re: Access Code - Unit 105", user: "You" },
   ]},
   { id: "CS-1002", customerName: "Jane Doe", unitNumber: "212", phone: "(403) 555-0283", email: "jane.doe@email.com", facilityName: "IT Crossing", status: "open", priority: "medium", assignedTo: "Unassigned", subject: "Billing inquiry - double charge", customerStatus: "active", balance: 125.0, lastPayment: "Jan 28, 2026", unitType: "5x10 Standard", createdAt: "Today 11:30 AM", communications: [
     { id: "c4", type: "email", direction: "inbound", timestamp: "Today 11:30 AM", preview: "I noticed I was charged twice for February rent. Can you please look into this and issue a refund for the duplicate charge?", subject: "Double Charge on My Account", from: "jane.doe@email.com" },
+  ], history: [
+    { id: "h4", timestamp: "Today 11:30 AM", action: "Case created", details: "Inbound email from customer", user: "System" },
   ]},
   { id: "CS-0998", customerName: "Robert Chen", unitNumber: "304", phone: "(403) 555-0391", email: "r.chen@outlook.com", facilityName: "IT Crossing", status: "waiting", priority: "low", assignedTo: "You", subject: "Request for unit transfer", customerStatus: "active", balance: 0, lastPayment: "Feb 1, 2026", unitType: "10x15 Drive-Up", createdAt: "Feb 5", communications: [
     { id: "c5", type: "email", direction: "inbound", timestamp: "Feb 5, 10:15 AM", preview: "I'd like to downsize to a smaller unit. Do you have any 5x10s available? Preferably on the ground floor.", subject: "Unit Transfer Request", from: "r.chen@outlook.com" },
     { id: "c6", type: "email", direction: "outbound", timestamp: "Feb 5, 2:30 PM", preview: "Hi Robert, we have a 5x10 on ground floor available (Unit 118). I'll hold it for 48 hours. Let me know if you'd like to proceed.", subject: "Re: Unit Transfer Request", from: "support@storagevault.ca" },
+  ], history: [
+    { id: "h5", timestamp: "Feb 5, 10:15 AM", action: "Case created", details: "Inbound email from customer", user: "System" },
+    { id: "h6", timestamp: "Feb 5, 10:30 AM", action: "Assigned", details: "Assigned to You", user: "System" },
+    { id: "h7", timestamp: "Feb 5, 2:30 PM", action: "Email sent", details: "Re: Unit Transfer Request", user: "You" },
+    { id: "h8", timestamp: "Feb 5, 2:35 PM", action: "Status changed", details: "Changed to Waiting", user: "You" },
   ]},
   { id: "CS-0995", customerName: "Maria Garcia", unitNumber: "089", phone: "(403) 555-0512", email: "mgarcia@gmail.com", facilityName: "IT Crossing", status: "resolved", priority: "high", assignedTo: "You", subject: "Water leak reported near unit", customerStatus: "active", balance: 0, lastPayment: "Feb 1, 2026", unitType: "10x10 Climate Control", createdAt: "Feb 3", communications: [
     { id: "c7", type: "phone", direction: "inbound", timestamp: "Feb 3, 9:00 AM", duration: "5m 10s", preview: "There's water pooling in the hallway near my unit. I'm worried it might get inside. Can someone come check?", from: "(403) 555-0512" },
     { id: "c8", type: "sms", direction: "outbound", timestamp: "Feb 3, 9:15 AM", preview: "Hi Maria, maintenance is on the way now. We'll inspect your unit and the hallway. ETA 30 minutes.", from: "support@storagevault.ca" },
     { id: "c9", type: "sms", direction: "outbound", timestamp: "Feb 3, 10:45 AM", preview: "Update: The leak was from a pipe fitting above the hallway. Fixed now. Your unit was not affected - no water inside. All clear!", from: "support@storagevault.ca" },
     { id: "c10", type: "sms", direction: "inbound", timestamp: "Feb 3, 11:00 AM", preview: "Thank you so much for the fast response! Really appreciate it.", from: "(403) 555-0512" },
+  ], history: [
+    { id: "h9", timestamp: "Feb 3, 9:00 AM", action: "Case created", details: "Urgent inbound call", user: "System" },
+    { id: "h10", timestamp: "Feb 3, 9:00 AM", action: "Priority set", details: "Set to High", user: "You" },
+    { id: "h11", timestamp: "Feb 3, 9:15 AM", action: "SMS sent", details: "Maintenance on the way", user: "You" },
+    { id: "h12", timestamp: "Feb 3, 10:45 AM", action: "SMS sent", details: "Issue resolved update", user: "You" },
+    { id: "h13", timestamp: "Feb 3, 11:15 AM", action: "Status changed", details: "Marked as Resolved", user: "You" },
   ]},
 ];
 function formatWaitTime(seconds: number) { const m = Math.floor(seconds / 60); const s = seconds % 60; return m + "m " + s.toString().padStart(2, "0") + "s"; }
@@ -247,10 +266,175 @@ function ActiveCallView({ caseData, callStartTime, onEndCall }: { caseData: any;
     </div>
   </div>;
 }
-function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
+function HistoryItem({ entry }: { entry: any }) {
+  return <div style={{ display: "flex", gap: "10px", padding: "8px 0" }}>
+    <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#94A3B8", marginTop: "6px", flexShrink: 0 }} />
+    <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <span style={{ fontSize: "13px", fontWeight: 500, color: "#0F172A" }}>{entry.action}</span>
+          {entry.details && <span style={{ fontSize: "13px", color: "#64748B" }}> — {entry.details}</span>}
+        </div>
+        <span style={{ fontSize: "11px", color: "#94A3B8", whiteSpace: "nowrap", marginLeft: "8px" }}>{entry.timestamp}</span>
+      </div>
+      <div style={{ fontSize: "11px", color: "#94A3B8", marginTop: "2px" }}>by {entry.user}</div>
+    </div>
+  </div>;
+}
+function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onAssign, onUpdateSubject, onUpdatePriority, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; onAssign?: (caseId: string, agent: string) => void; onUpdateSubject?: (caseId: string, subject: string) => void; onUpdatePriority?: (caseId: string, priority: string) => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
+  const [editingSubject, setEditingSubject] = useState(false);
+  const [subjectDraft, setSubjectDraft] = useState("");
+  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
+
   if (caseData && activeCallCaseId === caseData.id && callStartTime && onEndCall) {
     return <ActiveCallView caseData={caseData} callStartTime={callStartTime} onEndCall={onEndCall} />;
-  } if (!caseData) { return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", minHeight: "400px", color: "#94A3B8", fontSize: "14px", flexDirection: "column", gap: "8px" }}><span style={{ fontSize: "32px", opacity: 0.4 }}>&#128203;</span><span>Select a case to view details</span></div>; } const status = getStatusConfig(caseData.status); const priority = getPriorityConfig(caseData.priority); const isResolved = caseData.status === "resolved"; const isClosed = caseData.status === "closed"; return <div style={{ height: "100%", display: "flex", flexDirection: "column" }}><div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}><div><div style={{ fontSize: "18px", fontWeight: 700, color: "#0F172A", marginBottom: "4px" }}>{caseData.customerName}</div><div style={{ fontSize: "13px", color: "#64748B" }}>{caseData.id} &middot; {caseData.subject}</div></div><div style={{ display: "flex", gap: "6px" }}><Badge color={status.color} bg={status.bg}>{status.label}</Badge><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #F1F5F9" }}>{[{ label: "Unit", value: caseData.unitNumber + " \u00B7 " + caseData.unitType },{ label: "Phone", value: caseData.phone },{ label: "Email", value: caseData.email },{ label: "Balance", value: "$" + caseData.balance.toFixed(2), highlight: caseData.balance > 0 },{ label: "Status", value: caseData.customerStatus?.charAt(0).toUpperCase() + caseData.customerStatus?.slice(1) },{ label: "Assigned", value: caseData.assignedTo }].map((item: any, i: number) => <div key={i}><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>{item.label}</div><div style={{ fontSize: "13px", fontWeight: 500, color: item.highlight ? "#EF4444" : "#334155" }}>{item.value}</div></div>)}</div></div><div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}><div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "16px" }}>Communications ({caseData.communications.length})</div><div>{caseData.communications.map((comm: any, i: number) => <CommunicationItem key={comm.id} comm={comm} isFirst={i === 0} />)}</div></div><div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: "8px", flexWrap: "wrap" }}><button onClick={onSendEmail} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#10B981", backgroundColor: "transparent", border: "1px solid #10B981" }}><span style={{ fontSize: "14px" }}>{"\u2709\uFE0F"}</span>Send Email</button><button onClick={onSendSms} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#8B5CF6", backgroundColor: "transparent", border: "1px solid #8B5CF6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4AC}"}</span>Send SMS</button>{!isResolved && !isClosed && <button onClick={() => onStatusChange?.(caseData.id, "resolved")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#10B981", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u2713"}</span>Mark Resolved</button>}{isResolved && <button onClick={() => onStatusChange?.(caseData.id, "in-progress")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#F59E0B", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u21A9"}</span>Reopen Case</button>}{!isClosed && <button onClick={() => onStatusChange?.(caseData.id, "closed")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#64748B", backgroundColor: "transparent", border: "1px solid #E2E8F0" }}><span style={{ fontSize: "14px" }}>{"\u2715"}</span>Close Case</button>}</div></div>; }
+  }
+  if (!caseData) {
+    return <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", minHeight: "400px", color: "#94A3B8", fontSize: "14px", flexDirection: "column", gap: "8px" }}><span style={{ fontSize: "32px", opacity: 0.4 }}>&#128203;</span><span>Select a case to view details</span></div>;
+  }
+
+  const status = getStatusConfig(caseData.status);
+  const priority = getPriorityConfig(caseData.priority);
+  const isResolved = caseData.status === "resolved";
+  const isClosed = caseData.status === "closed";
+  const priorities = ["urgent", "high", "medium", "low"];
+
+  const handleStartEditSubject = () => {
+    setSubjectDraft(caseData.subject);
+    setEditingSubject(true);
+  };
+
+  const handleSaveSubject = () => {
+    if (subjectDraft.trim() && subjectDraft !== caseData.subject) {
+      onUpdateSubject?.(caseData.id, subjectDraft.trim());
+    }
+    setEditingSubject(false);
+  };
+
+  const handleCancelEditSubject = () => {
+    setEditingSubject(false);
+    setSubjectDraft("");
+  };
+
+  const handleKeyDownSubject = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveSubject();
+    } else if (e.key === "Escape") {
+      handleCancelEditSubject();
+    }
+  };
+
+  const handlePrioritySelect = (p: string) => {
+    onUpdatePriority?.(caseData.id, p);
+    setShowPriorityDropdown(false);
+  };
+
+  return <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#0F172A", marginBottom: "4px" }}>{caseData.customerName}</div>
+          <div style={{ fontSize: "13px", color: "#64748B", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>{caseData.id}</span>
+            <span>&middot;</span>
+            {editingSubject ? (
+              <input
+                type="text"
+                value={subjectDraft}
+                onChange={(e) => setSubjectDraft(e.target.value)}
+                onKeyDown={handleKeyDownSubject}
+                onBlur={handleSaveSubject}
+                autoFocus
+                style={{ fontSize: "13px", color: "#0F172A", border: "1px solid #3B82F6", borderRadius: "4px", padding: "2px 6px", outline: "none", minWidth: "200px" }}
+              />
+            ) : (
+              <span
+                onClick={handleStartEditSubject}
+                style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                title="Click to edit subject"
+              >
+                {caseData.subject}
+                <span style={{ fontSize: "11px", color: "#94A3B8" }}>{"\u270E"}</span>
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "6px", position: "relative" }}>
+          <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
+          <div style={{ position: "relative" }}>
+            <div onClick={() => setShowPriorityDropdown(!showPriorityDropdown)} style={{ cursor: "pointer" }} title="Click to change priority">
+              <Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge>
+            </div>
+            {showPriorityDropdown && (
+              <div style={{ position: "absolute", top: "100%", right: 0, marginTop: "4px", backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #E2E8F0", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", zIndex: 10, minWidth: "100px", overflow: "hidden" }}>
+                {priorities.map((p) => {
+                  const pc = getPriorityConfig(p);
+                  return <div key={p} onClick={() => handlePrioritySelect(p)} style={{ padding: "8px 12px", cursor: "pointer", backgroundColor: caseData.priority === p ? "#F8FAFC" : "#fff", display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: pc.color }} />
+                    {pc.label}
+                  </div>;
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #F1F5F9" }}>
+        {[
+          { label: "Unit", value: caseData.unitNumber + " \u00B7 " + caseData.unitType },
+          { label: "Phone", value: caseData.phone },
+          { label: "Email", value: caseData.email },
+          { label: "Balance", value: "$" + caseData.balance.toFixed(2), highlight: caseData.balance > 0 },
+          { label: "Status", value: caseData.customerStatus?.charAt(0).toUpperCase() + caseData.customerStatus?.slice(1) },
+        ].map((item: any, i: number) => (
+          <div key={i}>
+            <div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>{item.label}</div>
+            <div style={{ fontSize: "13px", fontWeight: 500, color: item.highlight ? "#EF4444" : "#334155" }}>{item.value}</div>
+          </div>
+        ))}
+        <div>
+          <div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Assigned</div>
+          <select
+            value={caseData.assignedTo}
+            onChange={(e) => onAssign?.(caseData.id, e.target.value)}
+            style={{ fontSize: "13px", fontWeight: 500, color: "#334155", border: "none", backgroundColor: "transparent", cursor: "pointer", padding: 0, margin: 0, outline: "none" }}
+          >
+            {AGENTS.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div style={{ flex: 1, overflow: "auto", padding: "20px 24px" }}>
+      <div style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "16px" }}>Communications ({caseData.communications.length})</div>
+      <div>{caseData.communications.map((comm: any, i: number) => <CommunicationItem key={comm.id} comm={comm} isFirst={i === 0} />)}</div>
+
+      {caseData.history && caseData.history.length > 0 && (
+        <div style={{ marginTop: "24px", borderTop: "1px solid #F1F5F9", paddingTop: "20px" }}>
+          <div
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A", marginBottom: "12px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            <span style={{ transition: "transform 0.15s", transform: historyExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>{"\u25B6"}</span>
+            Case History ({caseData.history.length})
+          </div>
+          {historyExpanded && (
+            <div style={{ borderLeft: "2px solid #E2E8F0", marginLeft: "3px", paddingLeft: "12px" }}>
+              {[...caseData.history].reverse().map((entry: any) => <HistoryItem key={entry.id} entry={entry} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+    <div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <button onClick={onSendEmail} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#10B981", backgroundColor: "transparent", border: "1px solid #10B981" }}><span style={{ fontSize: "14px" }}>{"\u2709\uFE0F"}</span>Send Email</button>
+      <button onClick={onSendSms} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#8B5CF6", backgroundColor: "transparent", border: "1px solid #8B5CF6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4AC}"}</span>Send SMS</button>
+      {!isResolved && !isClosed && <button onClick={() => onStatusChange?.(caseData.id, "resolved")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#10B981", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u2713"}</span>Mark Resolved</button>}
+      {isResolved && <button onClick={() => onStatusChange?.(caseData.id, "in-progress")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#F59E0B", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u21A9"}</span>Reopen Case</button>}
+      {!isClosed && <button onClick={() => onStatusChange?.(caseData.id, "closed")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#64748B", backgroundColor: "transparent", border: "1px solid #E2E8F0" }}><span style={{ fontSize: "14px" }}>{"\u2715"}</span>Close Case</button>}
+    </div>
+  </div>;
+}
 export default function CommunicationsHub() {
   const [activeTab, setActiveTab] = useState("queue");
   const [selectedId, setSelectedId] = useState<string | null>("CS-1001");
@@ -261,6 +445,7 @@ export default function CommunicationsHub() {
   const [showSmsModal, setShowSmsModal] = useState(false);
   const [activeCallCaseId, setActiveCallCaseId] = useState<string | null>(null);
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   useEffect(() => { const interval = setInterval(() => { setQueueItems((prev) => prev.map((item) => ({ ...item, waitTime: item.waitTime + 1 }))); }, 1000); return () => clearInterval(interval); }, []);
 
   const handleTakeCall = (queueItem: any) => {
@@ -296,6 +481,10 @@ export default function CommunicationsHub() {
         preview: "Call in progress...",
         from: queueItem.phoneNumber,
       }],
+      history: [
+        { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Inbound call from queue", user: "System" },
+        { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Call answered", details: "Call taken from queue", user: "You" },
+      ],
     };
 
     // Remove from queue
@@ -313,8 +502,36 @@ export default function CommunicationsHub() {
     setCallStartTime(Date.now());
   };
 
+  const addHistoryEntry = (caseId: string, action: string, details: string) => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    const entry = { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action, details, user: "You" };
+    setCases((prev) => prev.map((c) => c.id === caseId
+      ? { ...c, history: [...(c.history || []), entry] }
+      : c
+    ));
+  };
+
   const handleStatusChange = (caseId: string, newStatus: string) => {
+    const statusLabels: Record<string, string> = { open: "Open", "in-progress": "In Progress", waiting: "Waiting", resolved: "Resolved", closed: "Closed" };
     setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, status: newStatus } : c));
+    addHistoryEntry(caseId, "Status changed", `Changed to ${statusLabels[newStatus] || newStatus}`);
+  };
+
+  const handleAssignCase = (caseId: string, agent: string) => {
+    setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, assignedTo: agent } : c));
+    addHistoryEntry(caseId, "Assigned", `Assigned to ${agent}`);
+  };
+
+  const handleUpdateSubject = (caseId: string, subject: string) => {
+    setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, subject } : c));
+    addHistoryEntry(caseId, "Subject updated", subject);
+  };
+
+  const handleUpdatePriority = (caseId: string, priority: string) => {
+    const priorityLabels: Record<string, string> = { urgent: "Urgent", high: "High", medium: "Medium", low: "Low" };
+    setCases((prev) => prev.map((c) => c.id === caseId ? { ...c, priority } : c));
+    addHistoryEntry(caseId, "Priority changed", `Changed to ${priorityLabels[priority] || priority}`);
   };
 
   const handleEndCall = (notes: string, summary: string) => {
@@ -356,6 +573,7 @@ export default function CommunicationsHub() {
       from: "support@storagevault.ca",
     };
     setCases((prev) => prev.map((c) => c.id === selectedId ? { ...c, communications: [...c.communications, newComm] } : c));
+    addHistoryEntry(selectedId, "Email sent", email.subject);
     setShowEmailModal(false);
   };
 
@@ -372,11 +590,31 @@ export default function CommunicationsHub() {
       from: "support@storagevault.ca",
     };
     setCases((prev) => prev.map((c) => c.id === selectedId ? { ...c, communications: [...c.communications, newComm] } : c));
+    addHistoryEntry(selectedId, "SMS sent", sms.message.substring(0, 40) + (sms.message.length > 40 ? "..." : ""));
     setShowSmsModal(false);
   };
 
   const tabs = [{ id: "queue", label: "Queue", count: queueItems.length },{ id: "open", label: "Open Cases", count: cases.filter((c) => c.status === "open" || c.status === "in-progress").length },{ id: "my", label: "My Cases", count: cases.filter((c) => c.assignedTo === "You").length },{ id: "all", label: "All Cases", count: cases.length }];
-  const getFilteredCases = () => { switch (activeTab) { case "open": return cases.filter((c) => c.status === "open" || c.status === "in-progress"); case "my": return cases.filter((c) => c.assignedTo === "You"); case "all": return cases; default: return []; } };
+  const getFilteredCases = () => {
+    let filtered: typeof cases = [];
+    switch (activeTab) {
+      case "open": filtered = cases.filter((c) => c.status === "open" || c.status === "in-progress"); break;
+      case "my": filtered = cases.filter((c) => c.assignedTo === "You"); break;
+      case "all": filtered = cases; break;
+      default: filtered = [];
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((c) =>
+        c.customerName?.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q) ||
+        c.unitNumber?.toLowerCase().includes(q) ||
+        c.subject?.toLowerCase().includes(q) ||
+        c.phone?.includes(q)
+      );
+    }
+    return filtered;
+  };
   const selectedCase = cases.find((c) => c.id === selectedId);
   return <div style={{ width: "100%", height: "100vh", backgroundColor: "#F1F5F9", fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: "flex", flexDirection: "column", color: "#0F172A" }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0 }}>
@@ -385,8 +623,17 @@ export default function CommunicationsHub() {
     </div>
     <div style={{ display: "flex", gap: "8px", padding: "12px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0, overflowX: "auto" }}>{tabs.map((tab) => <TabButton key={tab.id} active={activeTab === tab.id} count={tab.count} onClick={() => { setActiveTab(tab.id); setSelectedId(null); }}>{tab.label}</TabButton>)}</div>
     <div style={{ flex: 1, display: "flex", overflow: "hidden", padding: "16px", gap: "16px" }}>
-      <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "8px", overflow: "auto", paddingRight: "4px" }}>{activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => setSelectedId(c.id)} />)}</div>
-      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => setShowEmailModal(true)} onSendSms={() => setShowSmsModal(true)} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
+      <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "8px", overflow: "hidden", paddingRight: "4px" }}>
+        {activeTab !== "queue" && <div style={{ position: "relative", flexShrink: 0 }}>
+          <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", fontSize: "16px", color: "#94A3B8" }}>{"\u{1F50D}"}</span>
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by name, case ID, unit..." style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: "8px", border: "1px solid #E2E8F0", fontSize: "13px", color: "#0F172A", outline: "none", backgroundColor: "#fff" }} />
+          {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "18px", height: "18px", borderRadius: "50%", border: "none", backgroundColor: "#E2E8F0", cursor: "pointer", fontSize: "11px", color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2715"}</button>}
+        </div>}
+        <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
+          {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => setSelectedId(c.id)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
+        </div>
+      </div>
+      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => setShowEmailModal(true)} onSendSms={() => setShowSmsModal(true)} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
     </div>
     {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} onClose={() => setShowEmailModal(false)} onSend={handleSendEmail} />}
     {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} onClose={() => setShowSmsModal(false)} onSend={handleSendSms} />}
