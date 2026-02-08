@@ -53,6 +53,111 @@ A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use 
 
 ---
 
+## STORAGE VAULT USE CASES (from customer discussions)
+
+These are the actual workflows Storage Vault needs. Each is mapped to our build status.
+
+### Use Cases — Status Map
+
+| Use Case | Status | Gap |
+|----------|--------|-----|
+| Inbound phone call (queue → take → case → transcript → summary) | ✅ Mostly built | Need recording player, transcript, AI summary |
+| Inbound SMS (webhook → match case → timeline → notify agent) | ⚠️ Partial | No real-time notification, no auto-case-matching UI |
+| Inbound email (webhook → match case → timeline → notify agent) | ⚠️ Partial | No real-time notification, no auto-case-matching UI |
+| Outbound SMS (agent sends from case) | ✅ Built | — |
+| Outbound call (agent initiates call from case) | ❌ Missing | No "Call Customer" button, no outbound call flow |
+| Automated outbound email (workflow/system sends) | ❌ Missing | No system/automated comm type in timeline |
+| Inbound live chat (route to agent, chat transcript) | ❌ Missing | Whole new channel — V2 |
+| Missed call (auto-create case, add to inbox) | ❌ Missing | No missed call concept at all |
+| SLA monitoring (overdue/at-risk cases, time criticality) | ❌ Missing | No SLA tracking or visual indicators |
+| Reporting (time to answer, calls abandoned, agent perf) | ❌ Missing | Separate module — V2 |
+| Skills-based routing (move-in team, billing team, etc.) | ❌ Missing | No team/skill labels on queue items |
+
+---
+
+## BUILD PHASES (Updated Priority)
+
+### Phase A: Gap Fixes — Must Have for Demo (this week)
+These close the most critical gaps between what we've built and what Storage Vault actually needs.
+
+#### A1. 🔲 Missed Call Handling
+**Gap:** If a call comes in and nobody picks up, nothing happens. Missed calls are a top pain point for storage facilities.
+**What to build:**
+- New queue item variant: `status: 'missed'` with red styling and "Missed Call" label
+- Missed calls auto-create a case with subject "Missed call — callback needed"
+- "Callback" button on missed call cases (opens outbound call flow or just highlights the phone number)
+- Add 1-2 missed call examples to mock data
+**Where:** QueueCard component (new variant), mock data, CaseDetailPanel (callback button)
+**UI:** Red accent bar on queue card, "☎️ Missed" badge, "Callback Needed" status on case
+
+#### A2. 🔲 Outbound Call Button
+**Gap:** Agents can't initiate calls from the UI. This is a fundamental helpdesk action.
+**What to build:**
+- "📞 Call Customer" button in CaseDetailPanel action bar (next to Send Email, Send SMS)
+- Clicking it shows a confirmation: "Call (403) 555-0147?" with Call / Cancel buttons
+- After confirming, show Active Call View (reuse existing component) but for outbound context
+- Outbound calls get logged as communications with `direction: 'outbound'` and `type: 'phone'`
+**Where:** CaseDetailPanel action buttons, new confirmation dialog, reuse ActiveCallView
+**Mock behavior:** Clicking Call shows the Active Call View with "Outbound call to [Customer]" header
+
+#### A3. 🔲 Real-Time Notification Indicators
+**Gap:** Agents don't know when new communications arrive unless they're staring at the screen.
+**What to build:**
+- Mock "toast" notification that slides in from top-right: "New SMS from John Smith on case CS-1001"
+- Unread dot indicator (blue dot) on cases with new unread communications
+- Badge count on tabs that updates: "Open Cases (3 • 1 new)"
+- Subtle pulse/flash animation on a queue card or case card when something new arrives
+**Where:** New Toast component, badge dots on CaseCard, tab count updates
+**Mock behavior:** Use a `setTimeout` to simulate a new communication arriving 30 seconds after page load. Toast appears, case gets blue dot, tab count increments. Shows the concept for demo.
+
+#### A4. 🔲 Automated/System Communications in Timeline
+**Gap:** No concept of system-triggered emails (payment reminders, overdue notices, appointment confirmations). Agents need to see these in the timeline but know they weren't manually sent.
+**What to build:**
+- New `sentBy` field on communications: `'agent'` | `'system'` | `'ai'`
+- System communications show a "🤖 Automated" or "⚙️ System" badge instead of agent name
+- AI-generated communications show "✨ AI" badge
+- Add 1-2 mock automated emails to existing cases (e.g., "Payment reminder sent automatically")
+**Where:** CommunicationItem component (new badge variant), mock data
+**UI:** Gray "System" badge, distinct from agent-sent green "Outbound" badge
+
+#### A5. 🔲 SLA Indicators on Cases
+**Gap:** No way to see which cases are aging and need urgent attention.
+**What to build:**
+- Calculate time since last response on each case
+- Visual indicator on case cards:
+  - Green: responded within 1 hour
+  - Yellow: "⏱ 2h since last response" — approaching SLA
+  - Red: "🚨 SLA Breach — 4h+ without response" — overdue
+- Cases sorted by SLA urgency within each tab (most overdue first)
+- Small SLA timer in CaseDetailPanel header
+**Where:** CaseCard component (SLA badge), case list sorting logic, CaseDetailPanel header
+**Mock data:** Set `lastResponseAt` timestamps on cases so some are green, some yellow, some red
+
+#### A6. 🔲 Skills/Team Labels on Queue Items
+**Gap:** No concept of routing — all calls go to everyone. Storage Vault wants move-in calls going to the move-in team, billing to billing, etc.
+**What to build:**
+- New `team` or `skillGroup` field on queue items: "Move-In", "Billing", "Maintenance", "General"
+- Small team label shown on queue cards below customer info
+- Optional: filter queue by team
+**Where:** QueueCard component, mock data
+**UI:** Subtle tag/chip below the unit info: "Billing" in blue, "Move-In" in green, "Maintenance" in orange
+
+### Phase B: AI Assist Layer (next week)
+See "AI ASSIST LAYER (COMPLETE)" section below for detailed specs.
+
+### Phase C: V2 Features (post-demo, post-launch)
+
+| Feature | Notes |
+|---------|-------|
+| Live chat channel | Whole new channel. Chat widget + agent chat interface + chat timeline entries. |
+| Reporting dashboard | Separate screen. Time to answer, calls abandoned, agent performance, SLA compliance. Needs production data collection from day one. |
+| Agent performance metrics | Depends on reporting infrastructure. |
+| WebSocket real-time updates | Replace mock notifications with actual real-time via Paul's backend. |
+| Mobile responsiveness | Current UI is desktop-only. |
+| Loading states / error handling | Production hardening. |
+
+---
+
 ## AI ASSIST LAYER (COMPLETE)
 
 ### Overview
@@ -303,11 +408,31 @@ interface Communication {
   timestamp: string;
   preview: string;
   from: string;
+  sentBy?: 'agent' | 'system' | 'ai';     // Who sent it
+  // Phone-specific:
   duration?: string;
   recordingUrl?: string;             // Twilio recording URL
   transcription?: TranscriptLine[];  // Speaker-diarized transcript
   aiSummary?: string;                // AI-generated 2-3 sentence summary
-  subject?: string;                  // Email subject
+  callStatus?: 'completed' | 'missed' | 'voicemail';
+  // Email-specific:
+  subject?: string;
+}
+
+interface QueueItem {
+  id: string;
+  customerName?: string;
+  unitNumber?: string;
+  phoneNumber: string;
+  waitTime: number;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'waiting' | 'assigned' | 'active' | 'missed';
+  facilityName?: string;
+  customerStatus?: string;
+  balance?: number;
+  email?: string;
+  unitType?: string;
+  skillGroup?: string;  // "Move-In", "Billing", "Maintenance", "General"
 }
 
 interface Case {
@@ -325,9 +450,11 @@ interface Case {
   balance: number;
   unitType: string;
   createdAt: string;
+  lastResponseAt?: string;          // For SLA calculation
   communications: Communication[];
   history?: HistoryEntry[];
   suggestedReplies?: SuggestedReply[];
+  hasUnread?: boolean;              // Blue dot indicator
 }
 ```
 
@@ -335,7 +462,10 @@ interface Case {
 - **Status:** Open=#3B82F6, In Progress=#F59E0B, Waiting=#FB923C, Resolved=#10B981, Closed=#6B7280
 - **Priority:** Urgent=#EF4444, High=#F59E0B, Medium=#3B82F6, Low=#6B7280
 - **Comm Types:** Phone=#3B82F6, Email=#10B981, SMS=#8B5CF6
-- **AI Accent:** ✨ elements use #6366F1 (indigo) to signal "AI-powered"
+- **AI Accent:** ✨ elements = #6366F1 (indigo)
+- **SLA:** Green=on track, Yellow=#F59E0B (approaching), Red=#EF4444 (breached)
+- **Missed Call:** Red=#EF4444 accent
+- **System/Auto:** Gray=#9CA3AF badge
 - **Background:** #F1F5F9, Cards: #fff, Borders: #E2E8F0
 
 ---
@@ -343,15 +473,23 @@ interface Case {
 ## WHAT TO TELL PAUL (BACKEND REQUIREMENTS)
 
 ### Immediate (this sprint)
-1. **Call recordings:** Ensure Twilio `RecordingUrl` is stored on each phone communication and returned via API
-2. **Transcription:** After call ends, pipe recording to Deepgram (or AssemblyAI) for speaker-diarized transcription. Store as array of `{ timestamp, speaker, text }`. Return in API response.
-3. **AI summaries:** After transcription completes, send transcript to Claude API (claude-sonnet-4-20250514) with prompt: *"Summarize this storage facility support call in 2-3 sentences. Include: what the customer needed, what the agent did, and the outcome."* Store as `aiSummary` on communication record.
+1. **Call recordings:** Store Twilio `RecordingUrl` on each phone communication, return via API
+2. **Transcription:** Pipe recordings to Deepgram for speaker-diarized transcription. Return as `{ timestamp, speaker, text }[]`
+3. **AI summaries:** After transcription, send to Claude API: "Summarize this call in 2-3 sentences." Store as `aiSummary`
+4. **Missed calls:** Twilio webhook for unanswered calls → create case with "Missed call — callback needed"
+5. **Outbound calls:** API endpoint to initiate call via Twilio, connect agent phone to customer phone
+6. **Case matching:** Inbound SMS/email → match to existing open case by phone/email, or create new case
+7. **SLA tracking:** Store `lastResponseAt` timestamp on cases, return via API
 
 ### Next sprint
-4. **Suggested replies:** On new inbound communication, generate 2-3 reply suggestions via Claude API. Return as `suggestedReplies` on case object.
+8. **Suggested replies:** On new inbound comm, generate 2-3 suggestions via Claude API
+9. **Real-time notifications:** WebSocket events for new comms, new queue items, case updates
+10. **Skills-based routing:** Tag incoming calls with skill group based on IVR selection or customer data
 
 ### Future
-5. **Retell AI integration** for AI voice agents (see AI Voice Agents section)
+11. **Retell AI integration** for AI voice agents
+12. **Live chat** channel (widget + backend)
+13. **Reporting** data collection pipeline
 
 ---
 
@@ -378,22 +516,17 @@ When Cory opens Claude Code in Cursor terminal:
 5. **Build incrementally** — one feature at a time
 6. **Test in browser** — Vite hot-reloads
 
-### Current Priority
-**CORE FEATURES COMPLETE — CLOSING SPEC GAPS**
+### Current Priority (Build Order)
+**Phase A — Gap fixes (this week):**
+1. A1: Missed call handling (queue variant + auto-case creation)
+2. A2: Outbound call button (Call Customer + confirmation + Active Call View reuse)
+3. A3: Real-time notification mock (toast + unread dots + tab badge updates)
+4. A4: System/automated communications in timeline (sentBy badges)
+5. A5: SLA indicators on cases (green/yellow/red based on response time)
+6. A6: Skills/team labels on queue items
 
-The Communications Hub has solid core functionality. Next up: close gaps from Storage Vault spec review.
-
-**What's working:**
-- Full helpdesk inbox UI (queue, cases, detail panel)
-- Call recordings with audio player
-- Call transcripts with speaker labels
-- AI call summaries, suggested replies, smart templates
-
-**Next to build (see Gap Analysis section):**
-1. 🔴 Missed Call handling (missed calls in queue + callback button)
-2. 🔴 Outbound Call button (agents initiate calls)
-3. 🟡 Real-time notification toast
-4. 🟡 Automated/System communications in timeline
+**Phase B — AI assist (next week):**
+Already built (see AI ASSIST LAYER section above)
 
 **After gaps closed:** Connect to Paul's backend for real Twilio integration.
 
