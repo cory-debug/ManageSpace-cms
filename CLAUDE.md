@@ -1,6 +1,6 @@
 # ManageSpace - Master Context Document
 
-**Last Updated:** February 8, 2026 (morning session)
+**Last Updated:** February 8, 2026 (late morning session)
 **Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
 **Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
@@ -19,7 +19,7 @@
 ### What It Is
 A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use it to manage inbound calls, emails, and SMS from storage tenants. Paul is building the backend (Twilio integration), Cory is building the frontend.
 
-### Current State (as of Feb 8, 11 AM)
+### Current State (as of Feb 8, 11:45 AM)
 
 **Working:**
 - ✅ React + TypeScript + Vite project running
@@ -43,14 +43,13 @@ A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use 
 - ✅ **Send SMS modal** — To, Message fields, character counter (160 char limit, segment indicator)
 - ✅ **Template system** — 5 email templates, 6 SMS templates with auto-placeholder replacement
 - ✅ **Active Call View** — live timer, customer context, notes field, call summary, quick actions, end call button
+- ✅ **Search/filter cases** — search by name, case ID, unit number, subject, phone
+- ✅ **Assign case to agent** — dropdown with You, Sarah M., Paul B., Unassigned
+- ✅ **Edit case subject** — click to edit inline, Enter to save, Escape to cancel
+- ✅ **Edit case priority** — click priority badge to open dropdown
+- ✅ **Case history/audit log** — collapsible timeline showing all changes with timestamps and user
 
-**Core functionality COMPLETE — ready for demo polish**
-
-**Next to build (nice-to-have for demo):**
-1. 🔲 Search/filter cases
-2. 🔲 Assign case to other agents
-3. 🔲 Edit case subject/priority
-4. 🔲 Case history/audit log
+**ALL DEMO FEATURES COMPLETE!**
 
 **Not started (future/post-demo):**
 - WebSocket/real-time integration with Paul's backend
@@ -117,6 +116,7 @@ All UI code is in `src/CommunicationsHub.tsx`. This is intentional for speed —
    - CommunicationItem — timeline entries
    - SendEmailModal, SendSMSModal — compose modals with template dropdowns
    - ActiveCallView — live call screen with timer, notes, quick actions
+   - HistoryItem — audit log timeline entries
    - CaseDetailPanel — main detail view (switches to ActiveCallView during calls)
 5. **Main component** (CommunicationsHub) — state management, handlers, layout
 
@@ -129,6 +129,15 @@ interface Case {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   communications: Communication[];
   assignedTo?: string;
+  history?: HistoryEntry[];
+}
+
+interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  action: string;
+  details: string;
+  user: string;
 }
 
 interface Communication {
@@ -217,9 +226,9 @@ When Cory opens Claude Code in Cursor terminal:
 - Pretty good and shipped > perfect and planned
 
 ### Current Priority
-**Core functionality DONE!** Polish for demo, then connect to Paul's backend when ready.
+**ALL DEMO FEATURES COMPLETE!** Ready to show Storage Vault. Next step is connecting to Paul's backend when ready.
 
-Remaining nice-to-haves: search/filter, assign to agent, edit case details.
+Potential enhancements (post-demo): real-time WebSocket integration, notification badges, loading states, error handling, mobile responsiveness.
 
 ---
 
