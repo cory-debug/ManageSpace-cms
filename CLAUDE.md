@@ -1,84 +1,238 @@
-# CLAUDE.md
+# ManageSpace - Master Context Document
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**Last Updated:** February 8, 2026 (morning session)
+**Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
+**Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
-## Project Overview
+---
 
-ManageSpace Revenue Intelligence Module - A revenue management tool for self-storage operators to generate and manage rent increase recommendations (ECRI - Existing Customer Rent Increases).
+## CRITICAL CONTEXT: SURVIVAL MODE
 
-**Tech Stack:** React Router 7 with SSR, SQLite (via better-sqlite3), Drizzle ORM, Tailwind CSS v4, TypeScript
+**Timeline:** 10 months until runway exhausted
+**Imperative:** Ship working products FAST to generate revenue and secure next customers/investors
+**Strategy:** Build base module demos to sell platform vision while delivering customer commitments
 
-## Monorepo Structure
+---
+
+## CURRENT BUILD: COMMUNICATIONS HUB
+
+### What It Is
+A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use it to manage inbound calls, emails, and SMS from storage tenants. Paul is building the backend (Twilio integration), Cory is building the frontend.
+
+### Current State (as of Feb 8, 11 AM)
+
+**Working:**
+- ✅ React + TypeScript + Vite project running
+- ✅ Two-panel inbox layout (queue left, case details right)
+- ✅ Tab navigation (Queue, Open Cases, My Cases, All Cases)
+- ✅ Queue cards with priority color bars, live wait timers
+- ✅ Case cards with status/priority badges
+- ✅ Case detail panel with customer info grid
+- ✅ Communication timeline with connected dots (phone/email/SMS)
+- ✅ Color-coded communication types (phone=blue, email=green, SMS=purple)
+- ✅ Status badges (Open, In Progress, Waiting, Resolved, Closed)
+- ✅ Priority badges (Urgent, High, Medium, Low)
+- ✅ "3 in queue" pulsing indicator in header
+- ✅ Long wait warning (red text when >3 min)
+- ✅ 4 realistic mock cases with Storage Vault scenarios
+- ✅ All visual polish from STORAGE_VAULT_COMMS_UI_SPEC.md applied
+- ✅ **Take Call logic** — removes from queue, creates case, switches to My Cases
+- ✅ **Mark Resolved / Close Case** — status change buttons with context-aware visibility
+- ✅ **Reopen Case** — appears on resolved cases to reopen
+- ✅ **Send Email modal** — To, Subject, Body fields, pre-filled with case data
+- ✅ **Send SMS modal** — To, Message fields, character counter (160 char limit, segment indicator)
+- ✅ **Template system** — 5 email templates, 6 SMS templates with auto-placeholder replacement
+- ✅ **Active Call View** — live timer, customer context, notes field, call summary, quick actions, end call button
+
+**Core functionality COMPLETE — ready for demo polish**
+
+**Next to build (nice-to-have for demo):**
+1. 🔲 Search/filter cases
+2. 🔲 Assign case to other agents
+3. 🔲 Edit case subject/priority
+4. 🔲 Case history/audit log
+
+**Not started (future/post-demo):**
+- WebSocket/real-time integration with Paul's backend
+- Notification badges
+- Loading states
+- Error handling
+- Mobile responsiveness
+
+### Project Location
 
 ```
-ManageSpace/
-├── revman/          # Main React Router application
-├── shared/          # Shared utilities (unit types, calculations)
-└── docs/            # Domain documentation
+/Users/cs/Documents/ManageSpace-cms/
+├── CLAUDE.md                              ← THIS FILE (root)
+├── communications-hub/
+│   ├── communications-hub/                ← ACTUAL PROJECT (nested — this is where code lives)
+│   │   ├── src/
+│   │   │   ├── App.tsx                    ← Imports CommunicationsHub
+│   │   │   ├── CommunicationsHub.tsx      ← MAIN COMPONENT (all UI code)
+│   │   │   ├── main.tsx
+│   │   │   └── index.css
+│   │   ├── index.html
+│   │   ├── package.json                   ✅ Fixed (type: module, dev: vite)
+│   │   ├── vite.config.ts
+│   │   ├── tailwind.config.js
+│   │   ├── postcss.config.js
+│   │   ├── tsconfig.json
+│   │   └── STORAGE_VAULT_COMMS_UI_SPEC.md
+│   ├── package.json                       ← OUTER (ignore, wrong level)
+│   ├── index.html                         ← OUTER (ignore, wrong level)
+│   └── node_modules/
+├── revman/
+├── shared/
+└── docs/
 ```
 
-## Development Commands
+**IMPORTANT:** The actual project is NESTED at `communications-hub/communications-hub/`. Always `cd` into the inner folder before running commands. The outer `communications-hub/` has a broken package.json and no src/ — ignore it.
 
-All commands run from `revman/` directory:
+### Tech Stack
+- React 19.2.4
+- TypeScript 5.9.3
+- Vite 7.3.1 (Rolldown-Vite)
+- Tailwind CSS 4.1.18 (installed but UI uses inline styles currently)
+- No routing library yet (single-page app for now)
 
+### Running the Dev Server
 ```bash
-npm run dev          # Start dev server (localhost:5173)
-npm run build        # Production build
-npm run start        # Run production server
-npm run typecheck    # Run TypeScript type checking
-npm run db:migrate   # Run database migrations
-npm run db:seed      # Seed database with sample data
-npm run db:reset     # Reset DB: delete data/, migrate, seed
+cd /Users/cs/Documents/ManageSpace-cms/communications-hub/communications-hub
+npx vite
+# Opens at http://localhost:5173 (or 5174/5175 if ports in use)
 ```
 
-## Architecture
+---
 
-### Application Structure (revman/)
+## ARCHITECTURE: SINGLE-FILE COMPONENT
 
-- **app/routes.ts** - Route configuration using React Router's layout/route/index pattern
-- **app/routes/** - Route components with colocated loaders/actions
-- **app/lib/** - Business logic services:
-  - `ecri-service.ts` - ECRI orchestration (DB queries + recommendation generation)
-  - `recommendation-engine.ts` - Pure functions for ECRI calculations
-  - `market-rate.ts` - Distance-weighted competitor market rate calculation
-  - `settings.ts` - Company/facility settings merge logic
-  - `types.ts` - TypeScript enums, interfaces, re-exports shared types
-- **app/db/** - Drizzle schema and database setup
-  - `schema.ts` - All table definitions with type exports
-  - `index.ts` - Database connection
-  - `migrate.ts` / `seed.ts` - Migration and seeding scripts
+All UI code is in `src/CommunicationsHub.tsx`. This is intentional for speed — we can break it into separate files later. The file contains:
 
-### Shared Module (shared/)
+1. **Templates** (EMAIL_TEMPLATES, SMS_TEMPLATES) — pre-written messages with {{placeholders}}
+2. **Mock data** (MOCK_QUEUE, MOCK_CASES) — realistic Storage Vault scenarios
+3. **Utility functions** (formatWaitTime, getPriorityConfig, getStatusConfig, getCommTypeConfig, applyTemplate)
+4. **Sub-components:**
+   - Badge, TabButton — shared UI elements
+   - QueueCard, CaseCard — list item cards
+   - CommunicationItem — timeline entries
+   - SendEmailModal, SendSMSModal — compose modals with template dropdowns
+   - ActiveCallView — live call screen with timer, notes, quick actions
+   - CaseDetailPanel — main detail view (switches to ActiveCallView during calls)
+5. **Main component** (CommunicationsHub) — state management, handlers, layout
 
-Imported via `@shared/*` alias. Contains canonical unit type definitions used across modules.
+### Data Model (from spec)
+```typescript
+interface Case {
+  id: string;
+  customerId: string;
+  status: 'open' | 'in-progress' | 'waiting' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  communications: Communication[];
+  assignedTo?: string;
+}
 
-### Path Aliases
+interface Communication {
+  id: string;
+  type: 'phone' | 'email' | 'sms';
+  direction: 'inbound' | 'outbound';
+  timestamp: Date;
+  content?: string;
+  transcription?: string;
+  recordingUrl?: string;
+}
 
-- `~/*` → `./app/*` (within revman)
-- `@shared/*` → `../shared/*` (monorepo shared code)
+interface QueueItem {
+  id: string;
+  customerName?: string;
+  phoneNumber: string;
+  waitTime: number;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'waiting' | 'assigned' | 'active';
+}
+```
 
-### Database
+### Color System
+- **Status:** Open=#3B82F6, In Progress=#F59E0B, Waiting=#FB923C, Resolved=#10B981, Closed=#6B7280
+- **Priority:** Urgent=#EF4444, High=#F59E0B, Medium=#3B82F6, Low=#6B7280
+- **Comm Types:** Phone=#3B82F6, Email=#10B981, SMS=#8B5CF6
+- **Background:** #F1F5F9, Cards: #fff, Borders: #E2E8F0
 
-SQLite stored at `revman/data/revman.db`. Schema includes:
-- Companies, CompanySettings, FacilitySettings (hierarchical config with inheritance)
-- Facilities, UnitTypes, Customers
-- EcriRecommendations, EcriHistory, EcriActions (recommendation lifecycle)
-- CompSets, Competitors, CompetitorRates (market rate data)
+---
 
-## Key Business Concepts
+## SPEC REFERENCE
 
-**ECRI Stances:** Three pricing aggressiveness levels:
-- Conservative (35% gap capture, ~2% churn)
-- Baseline (55% gap capture, ~5% churn)
-- Aggressive (75% gap capture, ~12% churn)
+Full UI spec is at: `communications-hub/communications-hub/STORAGE_VAULT_COMMS_UI_SPEC.md`
 
-**Position Categories:** Customer rent vs street/market rate determines base stance:
-- BELOW_STREET → Aggressive
-- AT_STREET → Aggressive
-- ABOVE_STREET_BELOW_MARKET → Baseline
-- AT_ABOVE_MARKET → Conservative
-- ABOVE_THRESHOLD → Skip
+Key screens built:
+1. ✅ Helpdesk Inbox (two-panel layout) — DONE
+2. ✅ Active Call View (live timer, customer context, notes, quick actions) — DONE
+3. ✅ Send Email Modal (templates, subject, body) — DONE
+4. ✅ Send SMS Modal (templates, character count) — DONE
 
-**Cohort Types:** LONG_TENURE, LARGE_GAP, POST_PROMO, HIGH_RISK
+**All core screens complete!**
 
-See `revman/docs/BRIEF.md` for complete business rules and decision tree.
+---
+
+## COMPANY OVERVIEW
+
+### ManageSpace
+- **Vision:** Shopify for self-storage (API-first platform, not monolithic PMS)
+- **Funding:** ~$2.2M raised, ~10 months runway, $80K-$150K monthly burn
+- **Competitive threat:** Cubby ($63M Goldman Sachs funding) — monolith vs our platform play
+
+### Team
+- **Cory Sylvester** — Co-founder, product, building UI with AI tools
+- **Adam Barker** — CTO, platform architecture
+- **Paul Banfield** — Engineering Lead, building comms backend (Twilio)
+- **Theo Brown** — Engineer, documents/AI
+- **Stephen Bluck** — Engineer, AI workflows
+
+### Key Customers
+1. **Morningstar Storage** (US) — ~83 facilities, April 1 go-live (core PMS)
+2. **Storage Vault Canada** — ~400 facilities, INVESTOR in ManageSpace
+
+### Critical Dates
+- **April 1, 2026:** Morningstar IT Crossing go-live
+- **Feb 14, 2026:** Target for working Comms Hub demo
+- **~December 2026:** Runway exhausted if no new revenue/investment
+
+---
+
+## WORKFLOW FOR CLAUDE CODE
+
+When Cory opens Claude Code in Cursor terminal:
+
+1. **Read this CLAUDE.md first** — it has all context
+2. **Work in the inner folder:** `cd communications-hub/communications-hub`
+3. **Edit files directly** — no copy-pasting needed
+4. **Run dev server:** `npx vite`
+5. **Build incrementally** — one feature at a time
+6. **Test in browser** — Vite hot-reloads automatically
+
+### Build Philosophy
+- Ship working features fast
+- Use mock data (Paul's API not ready yet)
+- Single file is fine for now (CommunicationsHub.tsx)
+- Inline styles are fine for now (can refactor to Tailwind later)
+- Pretty good and shipped > perfect and planned
+
+### Current Priority
+**Core functionality DONE!** Polish for demo, then connect to Paul's backend when ready.
+
+Remaining nice-to-haves: search/filter, assign to agent, edit case details.
+
+---
+
+## CORY'S WORK STYLE
+
+- Non-technical founder using AI tools (Claude Code, Cursor)
+- Moves fast, gets frustrated with setup issues
+- Needs clear, step-by-step guidance
+- ONE next step at a time
+- Keep him building, not planning
+- "Pretty good and shipped > perfect and planned"
+
+---
+
+**END OF MASTER CONTEXT DOCUMENT**
+*Update this file whenever significant progress is made or priorities change.*
