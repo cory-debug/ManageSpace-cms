@@ -48,10 +48,12 @@ const MOCK_CASES = [
     },
     { id: "c2", type: "email", direction: "outbound", timestamp: "Today 2:18 PM", preview: "Thanks for calling. Here's your new access code: 4821. This should work immediately at the gate keypad.", subject: "Re: Access Code - Unit 105", from: "support@storagevault.ca" },
     { id: "c3", type: "sms", direction: "inbound", timestamp: "Today 2:45 PM", preview: "Thank you, that helps! The new code worked perfectly.", from: "(403) 555-0147" },
+    { id: "c3b", type: "sms", direction: "outbound", timestamp: "Today 2:47 PM", preview: "Great to hear! Glad the new code is working. Don't hesitate to reach out if you need anything else.", from: "support@storagevault.ca" },
   ], history: [
     { id: "h1", timestamp: "Today 2:10 PM", action: "Case created", details: "Inbound call from customer", user: "System" },
     { id: "h2", timestamp: "Today 2:15 PM", action: "Call answered", details: "Call taken by agent", user: "You" },
     { id: "h3", timestamp: "Today 2:18 PM", action: "Email sent", details: "Re: Access Code - Unit 105", user: "You" },
+    { id: "h3b", timestamp: "Today 2:47 PM", action: "SMS sent", details: "Glad the new code is working", user: "You" },
   ], suggestedReplies: [
     { id: "sr1", label: "Confirm resolution", message: "Hi John,\n\nGreat to hear the new code is working! If you have any other issues with your unit or access, don't hesitate to reach out.\n\nBest regards,\nStorage Vault Team", channel: "email" },
     { id: "sr2", label: "Quick follow-up", message: "Glad the new code worked! Let us know if you need anything else.", channel: "sms" },
@@ -1025,7 +1027,7 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
         </div>
       )}
     </div>
-    {caseData.suggestedReplies && caseData.suggestedReplies.length > 0 && !suggestionsDismissed && (
+    {caseData.suggestedReplies && caseData.suggestedReplies.length > 0 && !suggestionsDismissed && !isResolved && !isClosed && (
       <SuggestedReplies
         suggestions={caseData.suggestedReplies}
         onSelect={(suggestion) => onSuggestedReply?.(suggestion)}
@@ -1037,7 +1039,7 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
       <button onClick={onSendEmail} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#10B981", backgroundColor: "transparent", border: "1px solid #10B981" }}><span style={{ fontSize: "14px" }}>{"\u2709\uFE0F"}</span>Send Email</button>
       <button onClick={onSendSms} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#8B5CF6", backgroundColor: "transparent", border: "1px solid #8B5CF6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4AC}"}</span>Send SMS</button>
       {!isResolved && !isClosed && <button onClick={() => onStatusChange?.(caseData.id, "resolved")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#10B981", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u2713"}</span>Mark Resolved</button>}
-      {isResolved && <button onClick={() => onStatusChange?.(caseData.id, "in-progress")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#F59E0B", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u21A9"}</span>Reopen Case</button>}
+      {(isResolved || isClosed) && <button onClick={() => onStatusChange?.(caseData.id, "in-progress")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#F59E0B", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u21A9"}</span>Reopen Case</button>}
       {!isClosed && <button onClick={() => onStatusChange?.(caseData.id, "closed")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#64748B", backgroundColor: "transparent", border: "1px solid #E2E8F0" }}><span style={{ fontSize: "14px" }}>{"\u2715"}</span>Close Case</button>}
     </div>
   </div>;
@@ -1056,6 +1058,7 @@ export default function CommunicationsHub() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showCallConfirm, setShowCallConfirm] = useState(false);
   const [pendingCallbackItem, setPendingCallbackItem] = useState<any>(null);
+  const [selectedQueueItem, setSelectedQueueItem] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'sms' | 'email' | 'phone' | 'info'; caseId?: string } | null>(null);
 
   // Timer for queue wait times
@@ -1378,7 +1381,7 @@ export default function CommunicationsHub() {
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: "#0F172A", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "14px", fontWeight: 700 }}>M</div><div><div style={{ fontSize: "16px", fontWeight: 700, color: "#0F172A", lineHeight: 1.2 }}>Communications Hub</div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500 }}>Storage Vault &middot; IT Crossing</div></div></div>
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}><div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "8px", backgroundColor: queueItems.length > 0 ? "#FEF2F2" : "#ECFDF5", fontSize: "12px", fontWeight: 600, color: queueItems.length > 0 ? "#EF4444" : "#10B981" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "currentColor", animation: queueItems.length > 0 ? "pulse 2s infinite" : "none" }} />{queueItems.length > 0 ? queueItems.length + " in queue" : "Queue clear"}</div><div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "#E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 600, color: "#475569", cursor: "pointer" }}>CS</div></div>
     </div>
-    <div style={{ display: "flex", gap: "8px", padding: "12px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0, overflowX: "auto" }}>{tabs.map((tab) => <TabButton key={tab.id} active={activeTab === tab.id} count={tab.count} newCount={tab.newCount} onClick={() => { setActiveTab(tab.id); setSelectedId(null); }}>{tab.label}</TabButton>)}</div>
+    <div style={{ display: "flex", gap: "8px", padding: "12px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0, overflowX: "auto" }}>{tabs.map((tab) => <TabButton key={tab.id} active={activeTab === tab.id} count={tab.count} newCount={tab.newCount} onClick={() => { setActiveTab(tab.id); setSelectedId(null); setSelectedQueueItem(null); }}>{tab.label}</TabButton>)}</div>
     <div style={{ flex: 1, display: "flex", overflow: "hidden", padding: "16px", gap: "16px" }}>
       <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "8px", overflow: "hidden", paddingRight: "4px" }}>
         {activeTab !== "queue" && <div style={{ position: "relative", flexShrink: 0 }}>
@@ -1387,10 +1390,63 @@ export default function CommunicationsHub() {
           {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "18px", height: "18px", borderRadius: "50%", border: "none", backgroundColor: "#E2E8F0", cursor: "pointer", fontSize: "11px", color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2715"}</button>}
         </div>}
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => { setSelectedId(c.id); if (c.hasUnread) setCases((prev) => prev.map((pc) => pc.id === c.id ? { ...pc, hasUnread: false } : pc)); }} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
+          {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => {
+            const matchedCase = cases.find((c) => c.phone === item.phoneNumber);
+            return <QueueCard key={item.id} item={item} selected={selectedId === item.id || selectedId === matchedCase?.id} onClick={() => { if (matchedCase) { setSelectedId(matchedCase.id); setSelectedQueueItem(null); } else { setSelectedId(item.id); setSelectedQueueItem(item); } }} onTakeCall={() => handleTakeCall(item)} />;
+          }) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => { setSelectedId(c.id); if (c.hasUnread) setCases((prev) => prev.map((pc) => pc.id === c.id ? { ...pc, hasUnread: false } : pc)); }} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
         </div>
       </div>
-      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => { setPrefilledMessage(""); setShowEmailModal(true); }} onSendSms={() => { setPrefilledMessage(""); setShowSmsModal(true); }} onSuggestedReply={(suggestion) => { setPrefilledMessage(suggestion.message); if (suggestion.channel === "email") setShowEmailModal(true); else setShowSmsModal(true); }} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} onCallCustomer={() => setShowCallConfirm(true)} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
+      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}>
+        {selectedCase ? (
+          <CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => { setPrefilledMessage(""); setShowEmailModal(true); }} onSendSms={() => { setPrefilledMessage(""); setShowSmsModal(true); }} onSuggestedReply={(suggestion) => { setPrefilledMessage(suggestion.message); if (suggestion.channel === "email") setShowEmailModal(true); else setShowSmsModal(true); }} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} onCallCustomer={() => setShowCallConfirm(true)} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} />
+        ) : selectedQueueItem ? (
+          <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: "#0F172A", marginBottom: "4px" }}>{selectedQueueItem.customerName || "Unknown Caller"}</div>
+                  <div style={{ fontSize: "13px", color: "#64748B" }}>{selectedQueueItem.phoneNumber}{selectedQueueItem.status === "missed" && selectedQueueItem.missedAt ? ` \u00B7 ${selectedQueueItem.missedAt}` : ""}</div>
+                </div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {selectedQueueItem.status === "missed" && <Badge color="#EF4444" bg="#FEF2F2">Missed Call</Badge>}
+                  {selectedQueueItem.status === "waiting" && <Badge color="#F59E0B" bg="#FFFBEB">Waiting</Badge>}
+                  <Badge color={getPriorityConfig(selectedQueueItem.priority).color} bg={getPriorityConfig(selectedQueueItem.priority).bg}>{getPriorityConfig(selectedQueueItem.priority).label}</Badge>
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #F1F5F9" }}>
+                <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Unit</div><div style={{ fontSize: "13px", fontWeight: 500, color: "#334155" }}>{selectedQueueItem.unitNumber || "Unknown"}</div></div>
+                <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Phone</div><div style={{ fontSize: "13px", fontWeight: 500, color: "#334155" }}>{selectedQueueItem.phoneNumber}</div></div>
+                <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Facility</div><div style={{ fontSize: "13px", fontWeight: 500, color: "#334155" }}>{selectedQueueItem.facilityName || "Unknown"}</div></div>
+                <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Status</div><div style={{ fontSize: "13px", fontWeight: 500, color: "#334155" }}>{selectedQueueItem.customerStatus ? selectedQueueItem.customerStatus.charAt(0).toUpperCase() + selectedQueueItem.customerStatus.slice(1) : "Unknown"}</div></div>
+                <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Balance</div><div style={{ fontSize: "13px", fontWeight: 500, color: selectedQueueItem.balance > 0 ? "#EF4444" : "#334155" }}>{selectedQueueItem.balance != null ? `$${selectedQueueItem.balance.toFixed(2)}` : "N/A"}</div></div>
+                {selectedQueueItem.skillGroup && <div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>Team</div><div style={{ fontSize: "13px", fontWeight: 500, color: getSkillGroupConfig(selectedQueueItem.skillGroup).color }}>{selectedQueueItem.skillGroup}</div></div>}
+              </div>
+            </div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
+              <div style={{ textAlign: "center" }}>
+                {selectedQueueItem.status === "missed" ? (
+                  <>
+                    <div style={{ fontSize: "48px", marginBottom: "16px", opacity: 0.6 }}>{"\u{1F4DE}"}</div>
+                    <div style={{ fontSize: "16px", fontWeight: 600, color: "#EF4444", marginBottom: "4px" }}>Missed Call</div>
+                    <div style={{ fontSize: "13px", color: "#64748B", marginBottom: "20px" }}>{selectedQueueItem.missedAt || "Call was not answered"}</div>
+                    <button onClick={() => handleTakeCall(selectedQueueItem)} style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 24px", borderRadius: "10px", fontSize: "15px", fontWeight: 600, cursor: "pointer", color: "#fff", backgroundColor: "#EF4444", border: "none", boxShadow: "0 4px 14px rgba(239, 68, 68, 0.3)" }}><span style={{ fontSize: "18px" }}>{"\u{1F4DE}"}</span>Callback</button>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "48px", marginBottom: "16px", opacity: 0.6 }}>{"\u{1F4DE}"}</div>
+                    <div style={{ fontSize: "16px", fontWeight: 600, color: "#10B981", marginBottom: "4px" }}>Incoming Call</div>
+                    <div style={{ fontSize: "13px", color: "#64748B", marginBottom: "4px" }}>Waiting: {formatWaitTime(selectedQueueItem.waitTime)}</div>
+                    <div style={{ fontSize: "13px", color: "#64748B", marginBottom: "20px" }}>No existing case for this caller</div>
+                    <button onClick={() => handleTakeCall(selectedQueueItem)} style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 24px", borderRadius: "10px", fontSize: "15px", fontWeight: 600, cursor: "pointer", color: "#fff", backgroundColor: "#10B981", border: "none", boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)" }}><span style={{ fontSize: "18px" }}>{"\u{1F4DE}"}</span>Take Call</button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <CaseDetailPanel caseData={null} />
+        )}
+      </div>
     </div>
     {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} prefilledBody={prefilledMessage} onClose={() => { setShowEmailModal(false); setPrefilledMessage(""); }} onSend={handleSendEmail} />}
     {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} prefilledMessage={prefilledMessage} onClose={() => { setShowSmsModal(false); setPrefilledMessage(""); }} onSend={handleSendSms} />}
