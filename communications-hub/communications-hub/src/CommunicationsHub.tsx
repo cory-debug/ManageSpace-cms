@@ -20,11 +20,11 @@ const SMS_TEMPLATES = [
 ];
 
 const MOCK_QUEUE = [
-  { id: "q1", customerName: "John Smith", unitNumber: "105", phoneNumber: "(403) 555-0147", waitTime: 154, priority: "high", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 0 },
-  { id: "q2", customerName: "Jane Doe", unitNumber: "212", phoneNumber: "(403) 555-0283", waitTime: 45, priority: "medium", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 125.0 },
-  { id: "q3", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0100", waitTime: 312, priority: "low", status: "waiting", facilityName: null, customerStatus: null, balance: null },
-  { id: "q4", customerName: "Mike Thompson", unitNumber: "078", phoneNumber: "(403) 555-0234", waitTime: 847, priority: "high", status: "missed", facilityName: "IT Crossing", customerStatus: "active", balance: 0, missedAt: "Today 1:45 PM" },
-  { id: "q5", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0399", waitTime: 1523, priority: "medium", status: "missed", facilityName: null, customerStatus: null, balance: null, missedAt: "Today 12:30 PM" },
+  { id: "q1", customerName: "John Smith", unitNumber: "105", phoneNumber: "(403) 555-0147", waitTime: 154, priority: "high", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 0, skillGroup: "General" },
+  { id: "q2", customerName: "Jane Doe", unitNumber: "212", phoneNumber: "(403) 555-0283", waitTime: 45, priority: "medium", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 125.0, skillGroup: "Billing" },
+  { id: "q3", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0100", waitTime: 312, priority: "low", status: "waiting", facilityName: null, customerStatus: null, balance: null, skillGroup: "Move-In" },
+  { id: "q4", customerName: "Mike Thompson", unitNumber: "078", phoneNumber: "(403) 555-0234", waitTime: 847, priority: "high", status: "missed", facilityName: "IT Crossing", customerStatus: "active", balance: 0, missedAt: "Today 1:45 PM", skillGroup: "Maintenance" },
+  { id: "q5", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0399", waitTime: 1523, priority: "medium", status: "missed", facilityName: null, customerStatus: null, balance: null, missedAt: "Today 12:30 PM", skillGroup: "Billing" },
 ];
 const MOCK_CASES = [
   { id: "CS-1001", customerName: "John Smith", unitNumber: "105", phone: "(403) 555-0147", email: "john.smith@email.com", facilityName: "IT Crossing", status: "in-progress", priority: "high", assignedTo: "You", subject: "Access code not working", customerStatus: "active", balance: 0, lastPayment: "Jan 15, 2026", unitType: "10x10 Climate Control", createdAt: "Today 2:10 PM", communications: [
@@ -254,11 +254,22 @@ function Toast({ message, type, icon, onDismiss, onAction, actionLabel }: { mess
 }
 
 function TabButton({ active, count, newCount, children, onClick }: { active: boolean; count?: number; newCount?: number; children: React.ReactNode; onClick: () => void }) { return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: active ? 600 : 500, color: active ? "#fff" : "#64748B", backgroundColor: active ? "#0F172A" : "transparent", border: active ? "none" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease", whiteSpace: "nowrap" }}>{children}{count !== undefined && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700, color: active ? "#0F172A" : "#fff", backgroundColor: active ? "#fff" : "#94A3B8", padding: "0 5px" }}>{count}</span>}{newCount !== undefined && newCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "10px", fontWeight: 700, color: "#fff", backgroundColor: "#EF4444", padding: "0 5px", animation: "pulse 2s infinite" }}>{newCount} new</span>}</button>; }
+function getSkillGroupConfig(skillGroup: string) {
+  const c: Record<string, { color: string; bg: string }> = {
+    "Move-In": { color: "#10B981", bg: "#ECFDF5" },
+    "Billing": { color: "#3B82F6", bg: "#EFF6FF" },
+    "Maintenance": { color: "#F59E0B", bg: "#FFFBEB" },
+    "General": { color: "#6B7280", bg: "#F9FAFB" },
+  };
+  return c[skillGroup] || c["General"];
+}
+
 function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selected: boolean; onClick: () => void; onTakeCall: () => void }) {
   const priority = getPriorityConfig(item.priority);
   const isUnknown = !item.customerName;
   const isMissed = item.status === "missed";
   const accentColor = isMissed ? "#EF4444" : priority.color;
+  const skill = item.skillGroup ? getSkillGroupConfig(item.skillGroup) : null;
 
   return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? (isMissed ? "#FEF2F2" : "#F8FAFC") : "#fff", border: selected ? `2px solid ${isMissed ? "#EF4444" : "#0F172A"}` : "1px solid #E2E8F0", transition: "all 0.15s ease", position: "relative", overflow: "hidden" }}>
     <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", backgroundColor: accentColor, borderRadius: "10px 0 0 10px" }} />
@@ -271,6 +282,7 @@ function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selecte
           {item.customerName || "Unknown Caller"}
         </div>
         {item.unitNumber ? <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>Unit {item.unitNumber} &middot; {item.facilityName}</div> : <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>{item.phoneNumber}</div>}
+        {skill && <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "4px", padding: "2px 8px", borderRadius: "4px", backgroundColor: skill.bg, border: `1px solid ${skill.color}25`, fontSize: "11px", fontWeight: 500, color: skill.color }}>{item.skillGroup}</div>}
       </div>
       {!isMissed && <Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge>}
     </div>
@@ -945,7 +957,7 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
           {sla && (
             <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "6px", backgroundColor: sla.bg, border: `1px solid ${sla.color}20` }}>
               <span style={{ fontSize: "12px" }}>{sla.status === 'breach' ? "\u{1F6A8}" : (sla.status === 'warning' ? "\u23F1" : "\u2713")}</span>
-              <span style={{ fontSize: "11px", fontWeight: 600, color: sla.color }}>{sla.status === 'ok' ? 'Responded' : (sla.status === 'warning' ? `Waiting ${sla.label}` : `SLA Breach: ${sla.label}`)}</span>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: sla.color }}>{sla.status === 'ok' ? 'Responded' : (sla.status === 'warning' ? `No response: ${sla.label}` : `SLA Breach: ${sla.label}`)}</span>
             </div>
           )}
           <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
@@ -969,12 +981,12 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "12px", padding: "14px 16px", backgroundColor: "#F8FAFC", borderRadius: "10px", border: "1px solid #F1F5F9" }}>
         {[
-          { label: "Unit", value: caseData.unitNumber + " \u00B7 " + caseData.unitType },
+          { label: "Unit", value: caseData.unitType && caseData.unitType !== "N/A" ? caseData.unitNumber + " \u00B7 " + caseData.unitType : caseData.unitNumber },
           { label: "Phone", value: caseData.phone },
           { label: "Email", value: caseData.email },
           { label: "Balance", value: "$" + caseData.balance.toFixed(2), highlight: caseData.balance > 0 },
           { label: "Status", value: caseData.customerStatus?.charAt(0).toUpperCase() + caseData.customerStatus?.slice(1) },
-        ].map((item: any, i: number) => (
+        ].filter((item: any) => item.value && item.value !== "N/A" && item.value !== "Unknown").map((item: any, i: number) => (
           <div key={i}>
             <div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>{item.label}</div>
             <div style={{ fontSize: "13px", fontWeight: 500, color: item.highlight ? "#EF4444" : "#334155" }}>{item.value}</div>
@@ -1043,12 +1055,13 @@ export default function CommunicationsHub() {
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showCallConfirm, setShowCallConfirm] = useState(false);
+  const [pendingCallbackItem, setPendingCallbackItem] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'sms' | 'email' | 'phone' | 'info'; caseId?: string } | null>(null);
 
   // Timer for queue wait times
   useEffect(() => { const interval = setInterval(() => { setQueueItems((prev) => prev.map((item) => ({ ...item, waitTime: item.waitTime + 1 }))); }, 1000); return () => clearInterval(interval); }, []);
 
-  // Simulate incoming SMS after 20 seconds (for demo)
+  // Simulate incoming SMS after 8 seconds (for demo)
   useEffect(() => {
     const timer = setTimeout(() => {
       const targetCaseId = "CS-1002"; // Jane Doe's case
@@ -1079,7 +1092,7 @@ export default function CommunicationsHub() {
 
       // Auto-dismiss toast after 8 seconds
       setTimeout(() => setToast(null), 8000);
-    }, 20000);
+    }, 8000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -1087,120 +1100,116 @@ export default function CommunicationsHub() {
   const handleTakeCall = (queueItem: any) => {
     const isMissedCall = queueItem.status === "missed";
 
-    // Generate new case ID
+    if (isMissedCall) {
+      // Show confirmation modal before calling back
+      setPendingCallbackItem(queueItem);
+      return;
+    }
+
+    // Normal inbound call handling
     const newCaseId = `CS-${nextCaseNum}`;
     setNextCaseNum((n) => n + 1);
-
-    // Create new case from queue item
     const now = new Date();
     const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
-    if (isMissedCall) {
-      // For missed calls: create case and start outbound call
-      const newCase = {
-        id: newCaseId,
-        customerName: queueItem.customerName || "Unknown Caller",
-        unitNumber: queueItem.unitNumber || "N/A",
-        phone: queueItem.phoneNumber,
-        email: "",
-        facilityName: queueItem.facilityName || "Unknown Facility",
-        status: "in-progress" as const,
-        priority: queueItem.priority,
-        assignedTo: "You",
-        subject: "Missed call — callback needed",
-        customerStatus: queueItem.customerStatus || "unknown",
-        balance: queueItem.balance || 0,
-        lastPayment: "N/A",
-        unitType: "N/A",
-        createdAt: `Today ${timeStr}`,
-        communications: [
-          {
-            id: `c-${Date.now() - 1}`,
-            type: "phone" as const,
-            direction: "inbound" as const,
-            timestamp: queueItem.missedAt || `Today ${timeStr}`,
-            duration: "0:00",
-            preview: "Missed call — no answer",
-            from: queueItem.phoneNumber,
-            callStatus: "missed" as const,
-          },
-          {
-            id: `c-${Date.now()}`,
-            type: "phone" as const,
-            direction: "outbound" as const,
-            timestamp: `Today ${timeStr}`,
-            duration: "Active",
-            preview: "Callback in progress...",
-            from: queueItem.phoneNumber,
-          }
-        ],
-        history: [
-          { id: `h-${Date.now() - 1}`, timestamp: queueItem.missedAt || `Today ${timeStr}`, action: "Missed call", details: "Inbound call was not answered", user: "System" },
-          { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Created from missed call queue", user: "System" },
-          { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Callback initiated", details: "Agent calling customer back", user: "You" },
-        ],
-      };
+    const newCase = {
+      id: newCaseId,
+      customerName: queueItem.customerName || "Unknown Caller",
+      unitNumber: queueItem.unitNumber || "N/A",
+      phone: queueItem.phoneNumber,
+      email: "",
+      facilityName: queueItem.facilityName || "Unknown Facility",
+      status: "in-progress" as const,
+      priority: queueItem.priority,
+      assignedTo: "You",
+      subject: "Inbound call",
+      customerStatus: queueItem.customerStatus || "unknown",
+      balance: queueItem.balance || 0,
+      lastPayment: "N/A",
+      unitType: "N/A",
+      createdAt: `Today ${timeStr}`,
+      communications: [{
+        id: `c-${Date.now()}`,
+        type: "phone" as const,
+        direction: "inbound" as const,
+        timestamp: `Today ${timeStr}`,
+        duration: "Active",
+        preview: "Call in progress...",
+        from: queueItem.phoneNumber,
+      }],
+      history: [
+        { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Inbound call from queue", user: "System" },
+        { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Call answered", details: "Call taken from queue", user: "You" },
+      ],
+    };
 
-      // Remove from queue
-      setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
+    setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
+    setCases((prev) => [newCase, ...prev]);
+    setActiveTab("my");
+    setSelectedId(newCaseId);
+    setActiveCallCaseId(newCaseId);
+    setCallStartTime(Date.now());
+  };
 
-      // Add to cases
-      setCases((prev) => [newCase, ...prev]);
+  const handleConfirmCallback = () => {
+    if (!pendingCallbackItem) return;
+    const queueItem = pendingCallbackItem;
+    setPendingCallbackItem(null);
 
-      // Switch to My Cases tab and select new case
-      setActiveTab("my");
-      setSelectedId(newCaseId);
+    const newCaseId = `CS-${nextCaseNum}`;
+    setNextCaseNum((n) => n + 1);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
-      // Start active call (outbound callback)
-      setActiveCallCaseId(newCaseId);
-      setCallStartTime(Date.now());
-    } else {
-      // Normal inbound call handling
-      const newCase = {
-        id: newCaseId,
-        customerName: queueItem.customerName || "Unknown Caller",
-        unitNumber: queueItem.unitNumber || "N/A",
-        phone: queueItem.phoneNumber,
-        email: "",
-        facilityName: queueItem.facilityName || "Unknown Facility",
-        status: "in-progress" as const,
-        priority: queueItem.priority,
-        assignedTo: "You",
-        subject: "Inbound call",
-        customerStatus: queueItem.customerStatus || "unknown",
-        balance: queueItem.balance || 0,
-        lastPayment: "N/A",
-        unitType: "N/A",
-        createdAt: `Today ${timeStr}`,
-        communications: [{
-          id: `c-${Date.now()}`,
+    const newCase = {
+      id: newCaseId,
+      customerName: queueItem.customerName || "Unknown Caller",
+      unitNumber: queueItem.unitNumber || "N/A",
+      phone: queueItem.phoneNumber,
+      email: "",
+      facilityName: queueItem.facilityName || "Unknown Facility",
+      status: "in-progress" as const,
+      priority: queueItem.priority,
+      assignedTo: "You",
+      subject: "Missed call — callback needed",
+      customerStatus: queueItem.customerStatus || "unknown",
+      balance: queueItem.balance || 0,
+      lastPayment: "N/A",
+      unitType: "N/A",
+      createdAt: `Today ${timeStr}`,
+      communications: [
+        {
+          id: `c-${Date.now() - 1}`,
           type: "phone" as const,
           direction: "inbound" as const,
+          timestamp: queueItem.missedAt || `Today ${timeStr}`,
+          duration: "0:00",
+          preview: "Missed call — no answer",
+          from: queueItem.phoneNumber,
+          callStatus: "missed" as const,
+        },
+        {
+          id: `c-${Date.now()}`,
+          type: "phone" as const,
+          direction: "outbound" as const,
           timestamp: `Today ${timeStr}`,
           duration: "Active",
-          preview: "Call in progress...",
+          preview: "Callback in progress...",
           from: queueItem.phoneNumber,
-        }],
-        history: [
-          { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Inbound call from queue", user: "System" },
-          { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Call answered", details: "Call taken from queue", user: "You" },
-        ],
-      };
+        }
+      ],
+      history: [
+        { id: `h-${Date.now() - 1}`, timestamp: queueItem.missedAt || `Today ${timeStr}`, action: "Missed call", details: "Inbound call was not answered", user: "System" },
+        { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Created from missed call — callback initiated", user: "System" },
+      ],
+    };
 
-      // Remove from queue
-      setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
-
-      // Add to cases
-      setCases((prev) => [newCase, ...prev]);
-
-      // Switch to My Cases tab and select new case
-      setActiveTab("my");
-      setSelectedId(newCaseId);
-
-      // Start active call
-      setActiveCallCaseId(newCaseId);
-      setCallStartTime(Date.now());
-    }
+    setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
+    setCases((prev) => [newCase, ...prev]);
+    setActiveTab("my");
+    setSelectedId(newCaseId);
+    setActiveCallCaseId(newCaseId);
+    setCallStartTime(Date.now());
   };
 
   const addHistoryEntry = (caseId: string, action: string, details: string) => {
@@ -1323,7 +1332,15 @@ export default function CommunicationsHub() {
     setShowSmsModal(false);
   };
 
-  const tabs = [{ id: "queue", label: "Queue", count: queueItems.length },{ id: "open", label: "Open Cases", count: cases.filter((c) => c.status === "open" || c.status === "in-progress").length },{ id: "my", label: "My Cases", count: cases.filter((c) => c.assignedTo === "You").length },{ id: "all", label: "All Cases", count: cases.length }];
+  const unreadCount = cases.filter((c) => c.hasUnread).length;
+  const openCases = cases.filter((c) => c.status === "open" || c.status === "in-progress");
+  const myCases = cases.filter((c) => c.assignedTo === "You");
+  const tabs = [
+    { id: "queue", label: "Queue", count: queueItems.length },
+    { id: "open", label: "Open Cases", count: openCases.length, newCount: openCases.filter((c) => c.hasUnread).length },
+    { id: "my", label: "My Cases", count: myCases.length, newCount: myCases.filter((c) => c.hasUnread).length },
+    { id: "all", label: "All Cases", count: cases.length, newCount: unreadCount },
+  ];
   const getFilteredCases = () => {
     let filtered: typeof cases = [];
     switch (activeTab) {
@@ -1361,7 +1378,7 @@ export default function CommunicationsHub() {
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: "#0F172A", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "14px", fontWeight: 700 }}>M</div><div><div style={{ fontSize: "16px", fontWeight: 700, color: "#0F172A", lineHeight: 1.2 }}>Communications Hub</div><div style={{ fontSize: "11px", color: "#94A3B8", fontWeight: 500 }}>Storage Vault &middot; IT Crossing</div></div></div>
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}><div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 12px", borderRadius: "8px", backgroundColor: queueItems.length > 0 ? "#FEF2F2" : "#ECFDF5", fontSize: "12px", fontWeight: 600, color: queueItems.length > 0 ? "#EF4444" : "#10B981" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "currentColor", animation: queueItems.length > 0 ? "pulse 2s infinite" : "none" }} />{queueItems.length > 0 ? queueItems.length + " in queue" : "Queue clear"}</div><div style={{ width: "32px", height: "32px", borderRadius: "50%", backgroundColor: "#E2E8F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 600, color: "#475569", cursor: "pointer" }}>CS</div></div>
     </div>
-    <div style={{ display: "flex", gap: "8px", padding: "12px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0, overflowX: "auto" }}>{tabs.map((tab) => <TabButton key={tab.id} active={activeTab === tab.id} count={tab.count} onClick={() => { setActiveTab(tab.id); setSelectedId(null); }}>{tab.label}</TabButton>)}</div>
+    <div style={{ display: "flex", gap: "8px", padding: "12px 24px", backgroundColor: "#fff", borderBottom: "1px solid #E2E8F0", flexShrink: 0, overflowX: "auto" }}>{tabs.map((tab) => <TabButton key={tab.id} active={activeTab === tab.id} count={tab.count} newCount={tab.newCount} onClick={() => { setActiveTab(tab.id); setSelectedId(null); }}>{tab.label}</TabButton>)}</div>
     <div style={{ flex: 1, display: "flex", overflow: "hidden", padding: "16px", gap: "16px" }}>
       <div style={{ width: "380px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "8px", overflow: "hidden", paddingRight: "4px" }}>
         {activeTab !== "queue" && <div style={{ position: "relative", flexShrink: 0 }}>
@@ -1378,6 +1395,7 @@ export default function CommunicationsHub() {
     {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} prefilledBody={prefilledMessage} onClose={() => { setShowEmailModal(false); setPrefilledMessage(""); }} onSend={handleSendEmail} />}
     {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} prefilledMessage={prefilledMessage} onClose={() => { setShowSmsModal(false); setPrefilledMessage(""); }} onSend={handleSendSms} />}
     {showCallConfirm && selectedCase && <CallConfirmModal phone={selectedCase.phone} customerName={selectedCase.customerName} onConfirm={handleInitiateCall} onCancel={() => setShowCallConfirm(false)} />}
+    {pendingCallbackItem && <CallConfirmModal phone={pendingCallbackItem.phoneNumber} customerName={pendingCallbackItem.customerName || "Unknown Caller"} onConfirm={handleConfirmCallback} onCancel={() => setPendingCallbackItem(null)} />}
     {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} onAction={toast.caseId ? () => { setActiveTab("open"); setSelectedId(toast.caseId!); setCases((prev) => prev.map((c) => c.id === toast.caseId ? { ...c, hasUnread: false } : c)); setToast(null); } : undefined} actionLabel={toast.caseId ? "View Case" : undefined} />}
     <style>{"@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }"}</style>
   </div>;
