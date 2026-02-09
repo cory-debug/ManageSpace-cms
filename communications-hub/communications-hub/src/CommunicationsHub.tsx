@@ -23,6 +23,8 @@ const MOCK_QUEUE = [
   { id: "q1", customerName: "John Smith", unitNumber: "105", phoneNumber: "(403) 555-0147", waitTime: 154, priority: "high", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 0 },
   { id: "q2", customerName: "Jane Doe", unitNumber: "212", phoneNumber: "(403) 555-0283", waitTime: 45, priority: "medium", status: "waiting", facilityName: "IT Crossing", customerStatus: "active", balance: 125.0 },
   { id: "q3", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0100", waitTime: 312, priority: "low", status: "waiting", facilityName: null, customerStatus: null, balance: null },
+  { id: "q4", customerName: "Mike Thompson", unitNumber: "078", phoneNumber: "(403) 555-0234", waitTime: 847, priority: "high", status: "missed", facilityName: "IT Crossing", customerStatus: "active", balance: 0, missedAt: "Today 1:45 PM" },
+  { id: "q5", customerName: null, unitNumber: null, phoneNumber: "(403) 555-0399", waitTime: 1523, priority: "medium", status: "missed", facilityName: null, customerStatus: null, balance: null, missedAt: "Today 12:30 PM" },
 ];
 const MOCK_CASES = [
   { id: "CS-1001", customerName: "John Smith", unitNumber: "105", phone: "(403) 555-0147", email: "john.smith@email.com", facilityName: "IT Crossing", status: "in-progress", priority: "high", assignedTo: "You", subject: "Access code not working", customerStatus: "active", balance: 0, lastPayment: "Jan 15, 2026", unitType: "10x10 Climate Control", createdAt: "Today 2:10 PM", communications: [
@@ -55,6 +57,8 @@ const MOCK_CASES = [
     { id: "sr2", label: "Quick follow-up", message: "Glad the new code worked! Let us know if you need anything else.", channel: "sms" },
   ]},
   { id: "CS-1002", customerName: "Jane Doe", unitNumber: "212", phone: "(403) 555-0283", email: "jane.doe@email.com", facilityName: "IT Crossing", status: "open", priority: "medium", assignedTo: "Unassigned", subject: "Billing inquiry - double charge", customerStatus: "active", balance: 125.0, lastPayment: "Jan 28, 2026", unitType: "5x10 Standard", createdAt: "Today 11:30 AM", communications: [
+    { id: "c4a", type: "email", direction: "outbound", timestamp: "Jan 28, 10:00 AM", preview: "Your payment of $125.00 for Unit 212 at IT Crossing has been processed successfully. Thank you for your payment!\n\nTransaction ID: TXN-2026-0128-001\nAmount: $125.00\nUnit: 212\nNext payment due: February 28, 2026", subject: "Payment Confirmation - Unit 212", from: "billing@storagevault.ca", sentBy: "system" },
+    { id: "c4b", type: "email", direction: "outbound", timestamp: "Feb 3, 10:00 AM", preview: "Your payment of $125.00 for Unit 212 at IT Crossing has been processed successfully. Thank you for your payment!\n\nTransaction ID: TXN-2026-0203-001\nAmount: $125.00\nUnit: 212\nNext payment due: March 28, 2026", subject: "Payment Confirmation - Unit 212", from: "billing@storagevault.ca", sentBy: "system" },
     { id: "c4", type: "email", direction: "inbound", timestamp: "Today 11:30 AM", preview: "I noticed I was charged twice for February rent. Can you please look into this and issue a refund for the duplicate charge?", subject: "Double Charge on My Account", from: "jane.doe@email.com" },
   ], history: [
     { id: "h4", timestamp: "Today 11:30 AM", action: "Case created", details: "Inbound email from customer", user: "System" },
@@ -101,6 +105,7 @@ const MOCK_CASES = [
     { id: "c8", type: "sms", direction: "outbound", timestamp: "Feb 3, 9:15 AM", preview: "Hi Maria, maintenance is on the way now. We'll inspect your unit and the hallway. ETA 30 minutes.", from: "support@storagevault.ca" },
     { id: "c9", type: "sms", direction: "outbound", timestamp: "Feb 3, 10:45 AM", preview: "Update: The leak was from a pipe fitting above the hallway. Fixed now. Your unit was not affected - no water inside. All clear!", from: "support@storagevault.ca" },
     { id: "c10", type: "sms", direction: "inbound", timestamp: "Feb 3, 11:00 AM", preview: "Thank you so much for the fast response! Really appreciate it.", from: "(403) 555-0512" },
+    { id: "c11", type: "email", direction: "outbound", timestamp: "Feb 3, 2:00 PM", preview: "Dear Maria,\n\nThank you for your patience during the water leak incident at IT Crossing today. We wanted to follow up and confirm that:\n\n• The pipe fitting has been fully repaired\n• Your unit (089) was inspected and confirmed dry with no water damage\n• Our maintenance team has completed a full inspection of the surrounding area\n\nWe take facility maintenance very seriously and appreciate you alerting us promptly. If you notice any issues in the future, please don't hesitate to contact us.\n\nBest regards,\nStorage Vault Team", subject: "Follow-up: Water Leak Incident - Unit 089", from: "support@storagevault.ca", sentBy: "ai" },
   ], history: [
     { id: "h9", timestamp: "Feb 3, 9:00 AM", action: "Case created", details: "Urgent inbound call", user: "System" },
     { id: "h10", timestamp: "Feb 3, 9:00 AM", action: "Priority set", details: "Set to High", user: "You" },
@@ -113,6 +118,60 @@ const MOCK_CASES = [
   ]},
 ];
 function formatWaitTime(seconds: number) { const m = Math.floor(seconds / 60); const s = seconds % 60; return m + "m " + s.toString().padStart(2, "0") + "s"; }
+
+// SLA helper - returns { status, label, color, bg, minutesAgo }
+function getSLAStatus(caseData: any): { status: 'ok' | 'warning' | 'breach'; label: string; color: string; bg: string; minutesAgo: number } | null {
+  // Skip SLA for resolved/closed cases
+  if (caseData.status === 'resolved' || caseData.status === 'closed') return null;
+
+  // Find the last inbound communication
+  const lastInbound = [...(caseData.communications || [])].reverse().find((c: any) => c.direction === 'inbound');
+  if (!lastInbound) return null;
+
+  // Find the last outbound communication after the last inbound
+  const lastInboundIndex = caseData.communications.findIndex((c: any) => c.id === lastInbound.id);
+  const hasResponseAfter = caseData.communications.slice(lastInboundIndex + 1).some((c: any) => c.direction === 'outbound' && c.sentBy !== 'system');
+
+  if (hasResponseAfter) {
+    return { status: 'ok', label: 'Responded', color: '#10B981', bg: '#ECFDF5', minutesAgo: 0 };
+  }
+
+  // Calculate time since last inbound (mock: use simple heuristics from timestamp)
+  // In production this would use actual timestamps
+  const timestamp = lastInbound.timestamp?.toLowerCase() || '';
+  let minutesAgo = 30; // default
+
+  if (timestamp.includes('today')) {
+    // Parse time like "Today 11:30 AM"
+    const timeMatch = timestamp.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+    if (timeMatch) {
+      let hours = parseInt(timeMatch[1]);
+      const mins = parseInt(timeMatch[2]);
+      const isPM = timeMatch[3].toLowerCase() === 'pm';
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+      const now = new Date();
+      const commTime = new Date();
+      commTime.setHours(hours, mins, 0, 0);
+      minutesAgo = Math.floor((now.getTime() - commTime.getTime()) / 60000);
+      if (minutesAgo < 0) minutesAgo = 30; // fallback
+    }
+  } else if (timestamp.includes('feb')) {
+    // Older date - assume > 4 hours for demo
+    minutesAgo = 300;
+  }
+
+  if (minutesAgo < 60) {
+    return { status: 'ok', label: `${minutesAgo}m`, color: '#10B981', bg: '#ECFDF5', minutesAgo };
+  } else if (minutesAgo < 240) {
+    const hours = Math.floor(minutesAgo / 60);
+    return { status: 'warning', label: `${hours}h ${minutesAgo % 60}m`, color: '#F59E0B', bg: '#FFFBEB', minutesAgo };
+  } else {
+    const hours = Math.floor(minutesAgo / 60);
+    return { status: 'breach', label: `${hours}h+ overdue`, color: '#EF4444', bg: '#FEF2F2', minutesAgo };
+  }
+}
+
 function getPriorityConfig(priority: string) { const c: Record<string, any> = { urgent: { color: "#EF4444", bg: "#FEF2F2", label: "Urgent" }, high: { color: "#F59E0B", bg: "#FFFBEB", label: "High" }, medium: { color: "#3B82F6", bg: "#EFF6FF", label: "Medium" }, low: { color: "#6B7280", bg: "#F9FAFB", label: "Low" } }; return c[priority] || c.low; }
 function getStatusConfig(status: string) { const c: Record<string, any> = { open: { color: "#3B82F6", bg: "#EFF6FF", label: "Open" }, "in-progress": { color: "#F59E0B", bg: "#FFFBEB", label: "In Progress" }, waiting: { color: "#FB923C", bg: "#FFF7ED", label: "Waiting" }, resolved: { color: "#10B981", bg: "#ECFDF5", label: "Resolved" }, closed: { color: "#6B7280", bg: "#F9FAFB", label: "Closed" } }; return c[status] || c.open; }
 function getCommTypeConfig(type: string) { const c: Record<string, any> = { phone: { color: "#3B82F6", bg: "#EFF6FF", icon: "\u{1F4DE}", label: "Phone" }, email: { color: "#10B981", bg: "#ECFDF5", icon: "\u2709\uFE0F", label: "Email" }, sms: { color: "#8B5CF6", bg: "#F5F3FF", icon: "\u{1F4AC}", label: "SMS" } }; return c[type] || c.phone; }
@@ -152,9 +211,116 @@ function getRecommendedSmsTemplate(caseData: any): { id: string; reason: string 
   return null;
 }
 function Badge({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) { return <span style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px", borderRadius: "9999px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.025em", color, backgroundColor: bg, textTransform: "uppercase" }}>{children}</span>; }
-function TabButton({ active, count, children, onClick }: { active: boolean; count?: number; children: React.ReactNode; onClick: () => void }) { return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: active ? 600 : 500, color: active ? "#fff" : "#64748B", backgroundColor: active ? "#0F172A" : "transparent", border: active ? "none" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease", whiteSpace: "nowrap" }}>{children}{count !== undefined && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700, color: active ? "#0F172A" : "#fff", backgroundColor: active ? "#fff" : "#94A3B8", padding: "0 5px" }}>{count}</span>}</button>; }
-function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selected: boolean; onClick: () => void; onTakeCall: () => void }) { const priority = getPriorityConfig(item.priority); const isUnknown = !item.customerName; return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : "#fff", border: selected ? "2px solid #0F172A" : "1px solid #E2E8F0", transition: "all 0.15s ease", position: "relative", overflow: "hidden" }}><div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", backgroundColor: priority.color, borderRadius: "10px 0 0 10px" }} /><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}><div><div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>{isUnknown && <span style={{ color: "#F59E0B", fontSize: "14px" }}>&#9888;</span>}{item.customerName || "Unknown Caller"}</div>{item.unitNumber ? <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>Unit {item.unitNumber} &middot; {item.facilityName}</div> : <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>{item.phoneNumber}</div>}</div><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}><div style={{ fontSize: "12px", color: item.waitTime > 180 ? "#EF4444" : "#64748B", fontWeight: item.waitTime > 180 ? 600 : 400, display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "14px" }}>&#9201;</span>{formatWaitTime(item.waitTime)}{item.waitTime > 180 && " \u2014 long wait"}</div><button onClick={(e) => { e.stopPropagation(); onTakeCall(); }} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#fff", backgroundColor: "#10B981", border: "none", cursor: "pointer" }}>Take Call</button></div></div>; }
-function CaseCard({ caseData, selected, onClick }: { caseData: any; selected: boolean; onClick: () => void }) { const status = getStatusConfig(caseData.status); const priority = getPriorityConfig(caseData.priority); const latestComm = caseData.communications[caseData.communications.length - 1]; const commType = getCommTypeConfig(latestComm?.type); return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : "#fff", border: selected ? "2px solid #0F172A" : "1px solid #E2E8F0", transition: "all 0.15s ease" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}><div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A" }}>{caseData.customerName}</div><Badge color={status.color} bg={status.bg}>{status.label}</Badge></div><div style={{ fontSize: "12px", color: "#64748B", marginBottom: "6px" }}>{caseData.id} &middot; Unit {caseData.unitNumber} &middot; {caseData.facilityName}</div><div style={{ fontSize: "13px", color: "#334155", marginBottom: "8px", fontWeight: 500 }}>{caseData.subject}</div><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748B" }}><span>{commType.icon}</span><span>{latestComm?.direction === "inbound" ? "From" : "Sent"} &middot; {latestComm?.timestamp}</span></div><Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge></div></div>; }
+
+function Toast({ message, type, icon, onDismiss, onAction, actionLabel }: { message: string; type: 'sms' | 'email' | 'phone' | 'info'; icon?: string; onDismiss: () => void; onAction?: () => void; actionLabel?: string }) {
+  const typeConfig: Record<string, { color: string; bg: string; icon: string }> = {
+    sms: { color: "#8B5CF6", bg: "#F5F3FF", icon: "\u{1F4AC}" },
+    email: { color: "#10B981", bg: "#ECFDF5", icon: "\u2709\uFE0F" },
+    phone: { color: "#3B82F6", bg: "#EFF6FF", icon: "\u{1F4DE}" },
+    info: { color: "#0F172A", bg: "#F8FAFC", icon: "\u{1F514}" },
+  };
+  const config = typeConfig[type] || typeConfig.info;
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: "20px",
+      right: "20px",
+      backgroundColor: "#fff",
+      borderRadius: "12px",
+      boxShadow: "0 10px 40px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)",
+      padding: "16px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: "12px",
+      maxWidth: "380px",
+      zIndex: 2000,
+      animation: "slideIn 0.3s ease-out",
+    }}>
+      <div style={{ width: "40px", height: "40px", borderRadius: "10px", backgroundColor: config.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", flexShrink: 0 }}>
+        {icon || config.icon}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: "14px", fontWeight: 500, color: "#0F172A", lineHeight: 1.4 }}>{message}</div>
+        {onAction && actionLabel && (
+          <button onClick={onAction} style={{ marginTop: "8px", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#fff", backgroundColor: config.color, border: "none", cursor: "pointer" }}>
+            {actionLabel}
+          </button>
+        )}
+      </div>
+      <button onClick={onDismiss} style={{ width: "24px", height: "24px", borderRadius: "6px", border: "none", backgroundColor: "transparent", cursor: "pointer", fontSize: "14px", color: "#94A3B8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{"\u2715"}</button>
+    </div>
+  );
+}
+
+function TabButton({ active, count, newCount, children, onClick }: { active: boolean; count?: number; newCount?: number; children: React.ReactNode; onClick: () => void }) { return <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: active ? 600 : 500, color: active ? "#fff" : "#64748B", backgroundColor: active ? "#0F172A" : "transparent", border: active ? "none" : "1px solid #E2E8F0", cursor: "pointer", transition: "all 0.15s ease", whiteSpace: "nowrap" }}>{children}{count !== undefined && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "11px", fontWeight: 700, color: active ? "#0F172A" : "#fff", backgroundColor: active ? "#fff" : "#94A3B8", padding: "0 5px" }}>{count}</span>}{newCount !== undefined && newCount > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: "18px", height: "18px", borderRadius: "9999px", fontSize: "10px", fontWeight: 700, color: "#fff", backgroundColor: "#EF4444", padding: "0 5px", animation: "pulse 2s infinite" }}>{newCount} new</span>}</button>; }
+function QueueCard({ item, selected, onClick, onTakeCall }: { item: any; selected: boolean; onClick: () => void; onTakeCall: () => void }) {
+  const priority = getPriorityConfig(item.priority);
+  const isUnknown = !item.customerName;
+  const isMissed = item.status === "missed";
+  const accentColor = isMissed ? "#EF4444" : priority.color;
+
+  return <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? (isMissed ? "#FEF2F2" : "#F8FAFC") : "#fff", border: selected ? `2px solid ${isMissed ? "#EF4444" : "#0F172A"}` : "1px solid #E2E8F0", transition: "all 0.15s ease", position: "relative", overflow: "hidden" }}>
+    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "3px", backgroundColor: accentColor, borderRadius: "10px 0 0 10px" }} />
+    {isMissed && <div style={{ position: "absolute", right: "12px", top: "12px" }}><Badge color="#EF4444" bg="#FEF2F2">Missed</Badge></div>}
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
+      <div style={{ maxWidth: isMissed ? "65%" : "75%" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A", display: "flex", alignItems: "center", gap: "6px" }}>
+          {isMissed && <span style={{ color: "#EF4444", fontSize: "14px" }}>&#128222;</span>}
+          {isUnknown && !isMissed && <span style={{ color: "#F59E0B", fontSize: "14px" }}>&#9888;</span>}
+          {item.customerName || "Unknown Caller"}
+        </div>
+        {item.unitNumber ? <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>Unit {item.unitNumber} &middot; {item.facilityName}</div> : <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>{item.phoneNumber}</div>}
+      </div>
+      {!isMissed && <Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge>}
+    </div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+      <div style={{ fontSize: "12px", color: isMissed ? "#EF4444" : (item.waitTime > 180 ? "#EF4444" : "#64748B"), fontWeight: isMissed || item.waitTime > 180 ? 600 : 400, display: "flex", alignItems: "center", gap: "4px" }}>
+        {isMissed ? (
+          <><span style={{ fontSize: "14px" }}>&#128337;</span>Missed {item.missedAt || formatWaitTime(item.waitTime) + " ago"}</>
+        ) : (
+          <><span style={{ fontSize: "14px" }}>&#9201;</span>{formatWaitTime(item.waitTime)}{item.waitTime > 180 && " \u2014 long wait"}</>
+        )}
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onTakeCall(); }} style={{ padding: "5px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, color: "#fff", backgroundColor: isMissed ? "#EF4444" : "#10B981", border: "none", cursor: "pointer" }}>
+        {isMissed ? "Callback" : "Take Call"}
+      </button>
+    </div>
+  </div>;
+}
+function CaseCard({ caseData, selected, onClick }: { caseData: any; selected: boolean; onClick: () => void }) {
+  const status = getStatusConfig(caseData.status);
+  const priority = getPriorityConfig(caseData.priority);
+  const latestComm = caseData.communications[caseData.communications.length - 1];
+  const commType = getCommTypeConfig(latestComm?.type);
+  const hasUnread = caseData.hasUnread;
+  const sla = getSLAStatus(caseData);
+
+  return (
+    <div onClick={onClick} style={{ padding: "14px 16px", borderRadius: "10px", cursor: "pointer", backgroundColor: selected ? "#F8FAFC" : (hasUnread ? "#EFF6FF" : (sla?.status === 'breach' ? "#FEF2F2" : "#fff")), border: selected ? "2px solid #0F172A" : (hasUnread ? "2px solid #3B82F6" : (sla?.status === 'breach' ? "2px solid #EF4444" : "1px solid #E2E8F0")), transition: "all 0.15s ease", position: "relative" }}>
+      {hasUnread && <div style={{ position: "absolute", top: "12px", right: "12px", width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#3B82F6", boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.2)", animation: "pulse 2s infinite" }} />}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: "#0F172A" }}>{caseData.customerName}</div>
+          {hasUnread && <span style={{ fontSize: "10px", fontWeight: 600, color: "#3B82F6", textTransform: "uppercase" }}>New</span>}
+        </div>
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {sla && <Badge color={sla.color} bg={sla.bg}>{sla.status === 'breach' ? `\u{1F6A8} ${sla.label}` : (sla.status === 'warning' ? `\u23F1 ${sla.label}` : sla.label)}</Badge>}
+          <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
+        </div>
+      </div>
+      <div style={{ fontSize: "12px", color: "#64748B", marginBottom: "6px" }}>{caseData.id} &middot; Unit {caseData.unitNumber} &middot; {caseData.facilityName}</div>
+      <div style={{ fontSize: "13px", color: "#334155", marginBottom: "8px", fontWeight: 500 }}>{caseData.subject}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748B" }}>
+          <span>{commType.icon}</span>
+          <span>{latestComm?.direction === "inbound" ? "From" : "Sent"} &middot; {latestComm?.timestamp}</span>
+        </div>
+        <Badge color={priority.color} bg={priority.bg}>{priority.label}</Badge>
+      </div>
+    </div>
+  );
+}
 function AudioPlayer({ recordingUrl, duration }: { recordingUrl: string; duration?: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -326,22 +492,52 @@ function CommunicationItem({ comm, isFirst }: { comm: any; isFirst: boolean }) {
   const hasRecording = comm.type === "phone" && comm.recordingUrl;
   const hasTranscript = comm.type === "phone" && comm.transcription && comm.transcription.length > 0;
   const hasAISummary = comm.type === "phone" && comm.aiSummary;
+  const isMissedCall = comm.type === "phone" && comm.callStatus === "missed";
+  const isSystem = comm.sentBy === "system";
+  const isAI = comm.sentBy === "ai";
+
+  // Determine icon based on sentBy
+  const getIcon = () => {
+    if (isMissedCall) return "\u{1F4F5}";
+    if (isSystem) return "\u2699\uFE0F";
+    if (isAI) return "\u2728";
+    return config.icon;
+  };
+
+  // Determine icon background
+  const getIconBg = () => {
+    if (isMissedCall) return "#FEF2F2";
+    if (isSystem) return "#F1F5F9";
+    if (isAI) return "#F5F3FF";
+    return config.bg;
+  };
 
   return (
     <div style={{ display: "flex", gap: "12px" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "32px", flexShrink: 0 }}>
         {!isFirst && <div style={{ width: "2px", height: "12px", backgroundColor: "#E2E8F0" }} />}
-        <div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: config.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{config.icon}</div>
+        <div style={{ width: "32px", height: "32px", borderRadius: "8px", backgroundColor: getIconBg(), display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>{getIcon()}</div>
         <div style={{ width: "2px", flex: 1, backgroundColor: "#E2E8F0", minHeight: "12px" }} />
       </div>
       <div style={{ flex: 1, padding: "8px 14px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "13px", fontWeight: 600, color: "#0F172A" }}>{config.label}</span>
-          <Badge color={comm.direction === "inbound" ? "#3B82F6" : "#10B981"} bg={comm.direction === "inbound" ? "#EFF6FF" : "#ECFDF5"}>{comm.direction}</Badge>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: isMissedCall ? "#EF4444" : (isSystem ? "#64748B" : (isAI ? "#6366F1" : "#0F172A")) }}>{isMissedCall ? "Missed Call" : config.label}</span>
+          {isMissedCall ? (
+            <Badge color="#EF4444" bg="#FEF2F2">missed</Badge>
+          ) : isSystem ? (
+            <Badge color="#64748B" bg="#F1F5F9">automated</Badge>
+          ) : isAI ? (
+            <Badge color="#6366F1" bg="#F5F3FF">ai generated</Badge>
+          ) : (
+            <Badge color={comm.direction === "inbound" ? "#3B82F6" : "#10B981"} bg={comm.direction === "inbound" ? "#EFF6FF" : "#ECFDF5"}>{comm.direction}</Badge>
+          )}
           <span style={{ fontSize: "12px", color: "#94A3B8" }}>{comm.timestamp}</span>
-          {comm.duration && <span style={{ fontSize: "12px", color: "#94A3B8" }}>&middot; {comm.duration}</span>}
+          {comm.duration && !isMissedCall && <span style={{ fontSize: "12px", color: "#94A3B8" }}>&middot; {comm.duration}</span>}
         </div>
-        <div style={{ fontSize: "13px", color: "#475569", lineHeight: "1.5", backgroundColor: "#F8FAFC", borderRadius: "8px", padding: "10px 12px", border: "1px solid #F1F5F9" }}>{comm.preview}</div>
+        <div style={{ fontSize: "13px", color: isMissedCall ? "#DC2626" : "#475569", lineHeight: "1.5", backgroundColor: isMissedCall ? "#FEF2F2" : (isSystem ? "#F8FAFC" : (isAI ? "#FAFAFE" : "#F8FAFC")), borderRadius: "8px", padding: "10px 12px", border: isMissedCall ? "1px solid #FECACA" : (isSystem ? "1px solid #E2E8F0" : (isAI ? "1px solid #E9D5FF" : "1px solid #F1F5F9")) }}>
+          {(isSystem || isAI) && <div style={{ fontSize: "10px", fontWeight: 600, color: isAI ? "#6366F1" : "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{isAI ? "\u2728 AI Generated" : "\u{1F916} Sent automatically"}</div>}
+          {comm.preview}
+        </div>
         {hasRecording && <AudioPlayer recordingUrl={comm.recordingUrl} duration={comm.duration} />}
         {hasAISummary && <AISummary summary={comm.aiSummary} />}
         {hasTranscript && <TranscriptSection transcription={comm.transcription} />}
@@ -525,15 +721,20 @@ function ActiveCallView({ caseData, callStartTime, onEndCall }: { caseData: any;
   }, [callStartTime]);
   const formatTime = (secs: number) => { const m = Math.floor(secs / 60); const s = secs % 60; return `${m}:${s.toString().padStart(2, "0")}`; };
   const priority = getPriorityConfig(caseData?.priority);
+
+  // Check if this is an outbound callback (last comm is outbound phone)
+  const lastComm = caseData?.communications?.[caseData.communications.length - 1];
+  const isOutboundCallback = lastComm?.type === "phone" && lastComm?.direction === "outbound";
+
   return <div style={{ height: "100%", display: "flex", flexDirection: "column", backgroundColor: "#fff" }}>
-    <div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9", background: "linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)" }}>
+    <div style={{ padding: "20px 24px", borderBottom: "1px solid #F1F5F9", background: isOutboundCallback ? "linear-gradient(135deg, #FEF2F2 0%, #FFF7ED 100%)" : "linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 2s infinite" }}>
-            <span style={{ fontSize: "24px" }}>{"\u{1F4DE}"}</span>
+          <div style={{ width: "48px", height: "48px", borderRadius: "50%", backgroundColor: isOutboundCallback ? "#F59E0B" : "#10B981", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 2s infinite" }}>
+            <span style={{ fontSize: "24px" }}>{isOutboundCallback ? "\u{1F4F2}" : "\u{1F4DE}"}</span>
           </div>
           <div>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "#10B981", textTransform: "uppercase", letterSpacing: "0.05em" }}>Active Call</div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: isOutboundCallback ? "#F59E0B" : "#10B981", textTransform: "uppercase", letterSpacing: "0.05em" }}>{isOutboundCallback ? "Callback to Customer" : "Active Call"}</div>
             <div style={{ fontSize: "28px", fontWeight: 700, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>{formatTime(elapsed)}</div>
           </div>
         </div>
@@ -640,7 +841,26 @@ function SuggestedReplies({ suggestions, onSelect, onDismiss }: { suggestions: A
   );
 }
 
-function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onSuggestedReply, onAssign, onUpdateSubject, onUpdatePriority, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; onSuggestedReply?: (suggestion: { message: string; channel: 'email' | 'sms' }) => void; onAssign?: (caseId: string, agent: string) => void; onUpdateSubject?: (caseId: string, subject: string) => void; onUpdatePriority?: (caseId: string, priority: string) => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
+function CallConfirmModal({ phone, customerName, onConfirm, onCancel }: { phone: string; customerName: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(15, 23, 42, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={onCancel}>
+      <div style={{ backgroundColor: "#fff", borderRadius: "16px", width: "100%", maxWidth: "400px", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "24px", textAlign: "center" }}>
+          <div style={{ width: "64px", height: "64px", borderRadius: "50%", backgroundColor: "#EFF6FF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "32px", margin: "0 auto 16px" }}>{"\u{1F4DE}"}</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "#0F172A", marginBottom: "8px" }}>Call Customer?</div>
+          <div style={{ fontSize: "14px", color: "#64748B", marginBottom: "4px" }}>{customerName}</div>
+          <div style={{ fontSize: "16px", fontWeight: 600, color: "#0F172A" }}>{phone}</div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: "12px" }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: "12px 20px", borderRadius: "8px", fontSize: "14px", fontWeight: 500, cursor: "pointer", color: "#64748B", backgroundColor: "transparent", border: "1px solid #E2E8F0" }}>Cancel</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: "12px 20px", borderRadius: "8px", fontSize: "14px", fontWeight: 600, cursor: "pointer", color: "#fff", backgroundColor: "#3B82F6", border: "none", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}><span>{"\u{1F4DE}"}</span>Call Now</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onSuggestedReply, onAssign, onUpdateSubject, onUpdatePriority, onCallCustomer, activeCallCaseId, callStartTime, onEndCall }: { caseData: any; onStatusChange?: (caseId: string, newStatus: string) => void; onSendEmail?: () => void; onSendSms?: () => void; onSuggestedReply?: (suggestion: { message: string; channel: 'email' | 'sms' }) => void; onAssign?: (caseId: string, agent: string) => void; onUpdateSubject?: (caseId: string, subject: string) => void; onUpdatePriority?: (caseId: string, priority: string) => void; onCallCustomer?: () => void; activeCallCaseId?: string | null; callStartTime?: number; onEndCall?: (notes: string, summary: string) => void }) {
   const [editingSubject, setEditingSubject] = useState(false);
   const [subjectDraft, setSubjectDraft] = useState("");
   const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
@@ -656,6 +876,7 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
 
   const status = getStatusConfig(caseData.status);
   const priority = getPriorityConfig(caseData.priority);
+  const sla = getSLAStatus(caseData);
   const isResolved = caseData.status === "resolved";
   const isClosed = caseData.status === "closed";
   const priorities = ["urgent", "high", "medium", "low"];
@@ -720,7 +941,13 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
             )}
           </div>
         </div>
-        <div style={{ display: "flex", gap: "6px", position: "relative" }}>
+        <div style={{ display: "flex", gap: "6px", position: "relative", alignItems: "center" }}>
+          {sla && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "6px", backgroundColor: sla.bg, border: `1px solid ${sla.color}20` }}>
+              <span style={{ fontSize: "12px" }}>{sla.status === 'breach' ? "\u{1F6A8}" : (sla.status === 'warning' ? "\u23F1" : "\u2713")}</span>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: sla.color }}>{sla.status === 'ok' ? 'Responded' : (sla.status === 'warning' ? `Waiting ${sla.label}` : `SLA Breach: ${sla.label}`)}</span>
+            </div>
+          )}
           <Badge color={status.color} bg={status.bg}>{status.label}</Badge>
           <div style={{ position: "relative" }}>
             <div onClick={() => setShowPriorityDropdown(!showPriorityDropdown)} style={{ cursor: "pointer" }} title="Click to change priority">
@@ -794,6 +1021,7 @@ function CaseDetailPanel({ caseData, onStatusChange, onSendEmail, onSendSms, onS
       />
     )}
     <div style={{ padding: "16px 24px", borderTop: "1px solid #F1F5F9", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <button onClick={onCallCustomer} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#3B82F6", backgroundColor: "transparent", border: "1px solid #3B82F6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4DE}"}</span>Call Customer</button>
       <button onClick={onSendEmail} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#10B981", backgroundColor: "transparent", border: "1px solid #10B981" }}><span style={{ fontSize: "14px" }}>{"\u2709\uFE0F"}</span>Send Email</button>
       <button onClick={onSendSms} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#8B5CF6", backgroundColor: "transparent", border: "1px solid #8B5CF6" }}><span style={{ fontSize: "14px" }}>{"\u{1F4AC}"}</span>Send SMS</button>
       {!isResolved && !isClosed && <button onClick={() => onStatusChange?.(caseData.id, "resolved")} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", transition: "all 0.15s ease", color: "#fff", backgroundColor: "#10B981", border: "none" }}><span style={{ fontSize: "14px" }}>{"\u2713"}</span>Mark Resolved</button>}
@@ -814,9 +1042,51 @@ export default function CommunicationsHub() {
   const [activeCallCaseId, setActiveCallCaseId] = useState<string | null>(null);
   const [callStartTime, setCallStartTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCallConfirm, setShowCallConfirm] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'sms' | 'email' | 'phone' | 'info'; caseId?: string } | null>(null);
+
+  // Timer for queue wait times
   useEffect(() => { const interval = setInterval(() => { setQueueItems((prev) => prev.map((item) => ({ ...item, waitTime: item.waitTime + 1 }))); }, 1000); return () => clearInterval(interval); }, []);
 
+  // Simulate incoming SMS after 20 seconds (for demo)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const targetCaseId = "CS-1002"; // Jane Doe's case
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+      // Add new inbound SMS to the case
+      const newComm = {
+        id: `c-${Date.now()}`,
+        type: "sms" as const,
+        direction: "inbound" as const,
+        timestamp: `Today ${timeStr}`,
+        preview: "I found the duplicate charge on my bank statement. The second one was on Feb 3rd for $125. Can you refund this ASAP?",
+        from: "(403) 555-0283",
+      };
+
+      setCases((prev) => prev.map((c) => c.id === targetCaseId
+        ? { ...c, communications: [...c.communications, newComm], hasUnread: true }
+        : c
+      ));
+
+      // Show toast notification
+      setToast({
+        message: "New SMS from Jane Doe on case CS-1002",
+        type: "sms",
+        caseId: targetCaseId,
+      });
+
+      // Auto-dismiss toast after 8 seconds
+      setTimeout(() => setToast(null), 8000);
+    }, 20000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleTakeCall = (queueItem: any) => {
+    const isMissedCall = queueItem.status === "missed";
+
     // Generate new case ID
     const newCaseId = `CS-${nextCaseNum}`;
     setNextCaseNum((n) => n + 1);
@@ -824,50 +1094,113 @@ export default function CommunicationsHub() {
     // Create new case from queue item
     const now = new Date();
     const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-    const newCase = {
-      id: newCaseId,
-      customerName: queueItem.customerName || "Unknown Caller",
-      unitNumber: queueItem.unitNumber || "N/A",
-      phone: queueItem.phoneNumber,
-      email: "",
-      facilityName: queueItem.facilityName || "Unknown Facility",
-      status: "in-progress" as const,
-      priority: queueItem.priority,
-      assignedTo: "You",
-      subject: "Inbound call",
-      customerStatus: queueItem.customerStatus || "unknown",
-      balance: queueItem.balance || 0,
-      lastPayment: "N/A",
-      unitType: "N/A",
-      createdAt: `Today ${timeStr}`,
-      communications: [{
-        id: `c-${Date.now()}`,
-        type: "phone" as const,
-        direction: "inbound" as const,
-        timestamp: `Today ${timeStr}`,
-        duration: "Active",
-        preview: "Call in progress...",
-        from: queueItem.phoneNumber,
-      }],
-      history: [
-        { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Inbound call from queue", user: "System" },
-        { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Call answered", details: "Call taken from queue", user: "You" },
-      ],
-    };
 
-    // Remove from queue
-    setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
+    if (isMissedCall) {
+      // For missed calls: create case and start outbound call
+      const newCase = {
+        id: newCaseId,
+        customerName: queueItem.customerName || "Unknown Caller",
+        unitNumber: queueItem.unitNumber || "N/A",
+        phone: queueItem.phoneNumber,
+        email: "",
+        facilityName: queueItem.facilityName || "Unknown Facility",
+        status: "in-progress" as const,
+        priority: queueItem.priority,
+        assignedTo: "You",
+        subject: "Missed call — callback needed",
+        customerStatus: queueItem.customerStatus || "unknown",
+        balance: queueItem.balance || 0,
+        lastPayment: "N/A",
+        unitType: "N/A",
+        createdAt: `Today ${timeStr}`,
+        communications: [
+          {
+            id: `c-${Date.now() - 1}`,
+            type: "phone" as const,
+            direction: "inbound" as const,
+            timestamp: queueItem.missedAt || `Today ${timeStr}`,
+            duration: "0:00",
+            preview: "Missed call — no answer",
+            from: queueItem.phoneNumber,
+            callStatus: "missed" as const,
+          },
+          {
+            id: `c-${Date.now()}`,
+            type: "phone" as const,
+            direction: "outbound" as const,
+            timestamp: `Today ${timeStr}`,
+            duration: "Active",
+            preview: "Callback in progress...",
+            from: queueItem.phoneNumber,
+          }
+        ],
+        history: [
+          { id: `h-${Date.now() - 1}`, timestamp: queueItem.missedAt || `Today ${timeStr}`, action: "Missed call", details: "Inbound call was not answered", user: "System" },
+          { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Created from missed call queue", user: "System" },
+          { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Callback initiated", details: "Agent calling customer back", user: "You" },
+        ],
+      };
 
-    // Add to cases
-    setCases((prev) => [newCase, ...prev]);
+      // Remove from queue
+      setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
 
-    // Switch to My Cases tab and select new case
-    setActiveTab("my");
-    setSelectedId(newCaseId);
+      // Add to cases
+      setCases((prev) => [newCase, ...prev]);
 
-    // Start active call
-    setActiveCallCaseId(newCaseId);
-    setCallStartTime(Date.now());
+      // Switch to My Cases tab and select new case
+      setActiveTab("my");
+      setSelectedId(newCaseId);
+
+      // Start active call (outbound callback)
+      setActiveCallCaseId(newCaseId);
+      setCallStartTime(Date.now());
+    } else {
+      // Normal inbound call handling
+      const newCase = {
+        id: newCaseId,
+        customerName: queueItem.customerName || "Unknown Caller",
+        unitNumber: queueItem.unitNumber || "N/A",
+        phone: queueItem.phoneNumber,
+        email: "",
+        facilityName: queueItem.facilityName || "Unknown Facility",
+        status: "in-progress" as const,
+        priority: queueItem.priority,
+        assignedTo: "You",
+        subject: "Inbound call",
+        customerStatus: queueItem.customerStatus || "unknown",
+        balance: queueItem.balance || 0,
+        lastPayment: "N/A",
+        unitType: "N/A",
+        createdAt: `Today ${timeStr}`,
+        communications: [{
+          id: `c-${Date.now()}`,
+          type: "phone" as const,
+          direction: "inbound" as const,
+          timestamp: `Today ${timeStr}`,
+          duration: "Active",
+          preview: "Call in progress...",
+          from: queueItem.phoneNumber,
+        }],
+        history: [
+          { id: `h-${Date.now()}`, timestamp: `Today ${timeStr}`, action: "Case created", details: "Inbound call from queue", user: "System" },
+          { id: `h-${Date.now() + 1}`, timestamp: `Today ${timeStr}`, action: "Call answered", details: "Call taken from queue", user: "You" },
+        ],
+      };
+
+      // Remove from queue
+      setQueueItems((prev) => prev.filter((item) => item.id !== queueItem.id));
+
+      // Add to cases
+      setCases((prev) => [newCase, ...prev]);
+
+      // Switch to My Cases tab and select new case
+      setActiveTab("my");
+      setSelectedId(newCaseId);
+
+      // Start active call
+      setActiveCallCaseId(newCaseId);
+      setCallStartTime(Date.now());
+    }
   };
 
   const addHistoryEntry = (caseId: string, action: string, details: string) => {
@@ -927,6 +1260,34 @@ export default function CommunicationsHub() {
     setCallStartTime(null);
   };
 
+  const handleInitiateCall = () => {
+    if (!selectedId) return;
+    const caseData = cases.find((c) => c.id === selectedId);
+    if (!caseData) return;
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+
+    // Add outbound phone communication
+    const newComm = {
+      id: `c-${Date.now()}`,
+      type: "phone" as const,
+      direction: "outbound" as const,
+      timestamp: `Today ${timeStr}`,
+      duration: "Active",
+      preview: "Outbound call in progress...",
+      from: caseData.phone,
+    };
+
+    setCases((prev) => prev.map((c) => c.id === selectedId ? { ...c, communications: [...c.communications, newComm], status: "in-progress" } : c));
+    addHistoryEntry(selectedId, "Outbound call", `Calling ${caseData.phone}`);
+
+    // Start active call view
+    setActiveCallCaseId(selectedId);
+    setCallStartTime(Date.now());
+    setShowCallConfirm(false);
+  };
+
   const handleSendEmail = (email: { to: string; subject: string; body: string }) => {
     if (!selectedId) return;
     const now = new Date();
@@ -981,6 +1342,17 @@ export default function CommunicationsHub() {
         c.phone?.includes(q)
       );
     }
+    // Sort by SLA urgency (breach first, then warning, then ok/null)
+    filtered.sort((a, b) => {
+      const slaA = getSLAStatus(a);
+      const slaB = getSLAStatus(b);
+      const urgencyOrder = { breach: 0, warning: 1, ok: 2 };
+      const urgencyA = slaA ? urgencyOrder[slaA.status] : 3;
+      const urgencyB = slaB ? urgencyOrder[slaB.status] : 3;
+      if (urgencyA !== urgencyB) return urgencyA - urgencyB;
+      // Within same urgency, sort by minutes waiting (higher first)
+      return (slaB?.minutesAgo || 0) - (slaA?.minutesAgo || 0);
+    });
     return filtered;
   };
   const selectedCase = cases.find((c) => c.id === selectedId);
@@ -998,13 +1370,15 @@ export default function CommunicationsHub() {
           {searchQuery && <button onClick={() => setSearchQuery("")} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", width: "18px", height: "18px", borderRadius: "50%", border: "none", backgroundColor: "#E2E8F0", cursor: "pointer", fontSize: "11px", color: "#64748B", display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2715"}</button>}
         </div>}
         <div style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => setSelectedId(c.id)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
+          {activeTab === "queue" ? (queueItems.length > 0 ? queueItems.map((item) => <QueueCard key={item.id} item={item} selected={selectedId === item.id} onClick={() => setSelectedId(item.id)} onTakeCall={() => handleTakeCall(item)} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u2713"}</div>Queue is clear</div>) : (getFilteredCases().length > 0 ? getFilteredCases().map((c) => <CaseCard key={c.id} caseData={c} selected={selectedId === c.id} onClick={() => { setSelectedId(c.id); if (c.hasUnread) setCases((prev) => prev.map((pc) => pc.id === c.id ? { ...pc, hasUnread: false } : pc)); }} />) : <div style={{ textAlign: "center", padding: "40px 20px", color: "#94A3B8", fontSize: "14px" }}><div style={{ fontSize: "32px", marginBottom: "8px", opacity: 0.4 }}>{"\u{1F50D}"}</div>{searchQuery ? "No cases match your search" : "No cases"}</div>)}
         </div>
       </div>
-      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => { setPrefilledMessage(""); setShowEmailModal(true); }} onSendSms={() => { setPrefilledMessage(""); setShowSmsModal(true); }} onSuggestedReply={(suggestion) => { setPrefilledMessage(suggestion.message); if (suggestion.channel === "email") setShowEmailModal(true); else setShowSmsModal(true); }} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
+      <div style={{ flex: 1, backgroundColor: "#fff", borderRadius: "12px", border: "1px solid #E2E8F0", overflow: "hidden", minWidth: "400px" }}><CaseDetailPanel caseData={selectedCase} onStatusChange={handleStatusChange} onSendEmail={() => { setPrefilledMessage(""); setShowEmailModal(true); }} onSendSms={() => { setPrefilledMessage(""); setShowSmsModal(true); }} onSuggestedReply={(suggestion) => { setPrefilledMessage(suggestion.message); if (suggestion.channel === "email") setShowEmailModal(true); else setShowSmsModal(true); }} onAssign={handleAssignCase} onUpdateSubject={handleUpdateSubject} onUpdatePriority={handleUpdatePriority} onCallCustomer={() => setShowCallConfirm(true)} activeCallCaseId={activeCallCaseId} callStartTime={callStartTime || undefined} onEndCall={handleEndCall} /></div>
     </div>
     {showEmailModal && selectedCase && <SendEmailModal caseData={selectedCase} prefilledBody={prefilledMessage} onClose={() => { setShowEmailModal(false); setPrefilledMessage(""); }} onSend={handleSendEmail} />}
     {showSmsModal && selectedCase && <SendSMSModal caseData={selectedCase} prefilledMessage={prefilledMessage} onClose={() => { setShowSmsModal(false); setPrefilledMessage(""); }} onSend={handleSendSms} />}
-    <style>{"@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
+    {showCallConfirm && selectedCase && <CallConfirmModal phone={selectedCase.phone} customerName={selectedCase.customerName} onConfirm={handleInitiateCall} onCancel={() => setShowCallConfirm(false)} />}
+    {toast && <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} onAction={toast.caseId ? () => { setActiveTab("open"); setSelectedId(toast.caseId!); setCases((prev) => prev.map((c) => c.id === toast.caseId ? { ...c, hasUnread: false } : c)); setToast(null); } : undefined} actionLabel={toast.caseId ? "View Case" : undefined} />}
+    <style>{"@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }"}</style>
   </div>;
 }

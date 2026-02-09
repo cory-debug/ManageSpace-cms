@@ -1,6 +1,6 @@
 # ManageSpace - Master Context Document
 
-**Last Updated:** February 8, 2026 (evening session — Gap analysis added)
+**Last Updated:** February 8, 2026 (afternoon — UX principles + gap analysis + architecture)
 **Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
 **Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
@@ -11,6 +11,74 @@
 **Timeline:** 10 months until runway exhausted
 **Imperative:** Ship working products FAST to generate revenue and secure next customers/investors
 **Strategy:** Build base module demos to sell platform vision while delivering customer commitments
+
+---
+
+## UI/UX DESIGN PRINCIPLES (APPLIES TO ALL MODULES)
+
+These are non-negotiable. Every screen, component, and interaction across all ManageSpace modules must follow these principles. Claude Code should evaluate every UI decision against this list before writing code.
+
+### Two-Tier UX Model
+
+ManageSpace has two categories of UI, each with different complexity tolerances. **Both tiers share the same design system** (fonts, colors, card styles, badges, light theme, overall visual feel). What differs is information density and the assumption about user training.
+
+**Tier 1: Line Worker UI** (Comms Hub, future front-desk tools)
+- Users: Hourly employees, high turnover, minimal training
+- Zero learning curve — productive in 60 seconds
+- Absolute minimum clicks and scrolling
+- No jargon, no abbreviations without labels
+- Everything self-evident — no guessing what a button does
+- Optimized for speed during live interactions (calls, walk-ins)
+
+**Tier 2: Management UI** (ECRI, Revenue Management, Reporting, Pricing Model)
+- Users: Corporate staff, regional managers, revenue analysts — fewer people, more domain knowledge
+- Higher information density is acceptable and expected — these users WANT to see data
+- Still follows the same visual language (light theme, same fonts, same colors, same badge styles)
+- Still minimizes unnecessary friction — but "unnecessary" is calibrated for trained users
+- Tables with many columns are OK if the columns are meaningful
+- Abbreviations (CC, NCC, FF, DU) are acceptable — these users know what they mean
+- Progressive disclosure for deep analysis (expand rows for competitor data, AI rationale)
+- Batch actions are critical — reviewing 50+ items one by one is a workflow, not a one-off task
+
+**The universal rule across both tiers:** Same fonts. Same colors. Same card styles. Same badges. Same light theme. Same overall feel. An operator should feel like they're in the same product whether they're in Comms Hub or ECRI — even though the complexity level differs.
+
+### Principle 1: Minimize Clicks and Scrolling (Critical for Tier 1, Important for Tier 2)
+- **One-click actions.** If an action takes 3 clicks, find a way to make it 1. If it takes 2 clicks, question whether it could be 1. Every extra click is friction that slows the agent down during a live call.
+- **No page navigation for core workflows.** The main workflows (take call, view case, send reply, resolve) should all happen on the same screen without navigating away. Modals and slide-out panels over the current view — never full page transitions for routine actions.
+- **Visible without scrolling.** The most important information and actions must be visible in the initial viewport. If the agent has to scroll to find the "Send Email" button or see the customer's phone number, the layout is wrong. Use fixed/sticky positioning for action bars and customer context.
+- **Progressive disclosure only for secondary info.** Primary information (customer name, unit, phone, status, most recent communication) is always visible. Secondary info (full history, audit log, older comms) is collapsed/expandable. Never hide critical info behind a click.
+
+### Principle 2: Self-Evident UI (Critical for Tier 1, Relaxed for Tier 2)
+- **Labels on everything.** No icon-only buttons. Every button has a text label. Icons supplement labels, they don't replace them. A new user shouldn't have to hover over an icon to discover what it does.
+- **Status communicates through color + text.** Never rely on color alone (accessibility). Every colored badge also has a text label: "Open", "In Progress", "SLA Breach". Users shouldn't have to remember what yellow means.
+- **Contextual actions only.** Don't show actions that can't be taken. If a case is already resolved, don't show a "Mark Resolved" button — show "Reopen Case" instead. The UI should only present what's currently possible.
+- **Sensible defaults.** Forms should be pre-filled with the most likely values. The "To" field should already have the customer's email. The template should be pre-selected based on case context. The agent should only need to review and click send, not fill out fields from scratch.
+
+### Principle 3: Information Hierarchy
+- **Most urgent → top left.** The human eye scans top-left to bottom-right. The most time-sensitive information (queue with live wait times, SLA breaches, unread messages) goes top-left. Resolved/archived content goes bottom or behind a tab.
+- **Customer context always visible.** When viewing any case, the customer's name, unit number, phone, email, and account status should be visible at all times without scrolling or clicking into a sub-panel.
+- **Dense but not cluttered.** Storage facility agents handle high volume. Show as much useful information per screen as possible, but use whitespace, borders, and visual grouping to prevent overwhelm. Think Bloomberg terminal — dense but organized — not Notion — spacious but requires clicking into everything.
+- **Inline actions.** Agents should be able to act on items directly from list views (quick-assign, quick-resolve) without opening the full detail panel first.
+
+### Principle 4: Speed Over Polish
+- **Keyboard shortcuts for power users.** Common actions should have keyboard shortcuts (E = email, S = SMS, R = resolve). Not required for MVP but the architecture should support it.
+- **Instant feedback.** Every click should produce an immediate visual response — button state change, toast notification, loading indicator. Never leave the user wondering "did that work?"
+- **No loading gates.** The UI should render immediately with whatever data is available. If AI suggestions are still loading, show the case without them and add them when ready. Never block the entire view waiting for one data source.
+
+### Principle 5: Consistency Across Modules
+- **Same layout patterns.** Every ManageSpace module uses the same structure: list panel (left) + detail panel (right). Same header bar. Same color system. Same badge styles. An agent trained on Comms Hub should feel at home in ECRI or any other module instantly.
+- **Shared component library.** Badge, TabButton, StatusBadge, PriorityBadge, SearchBar, Modal, Toast — all should look and behave identically across modules. When building a new module, reuse these patterns.
+- **Same interaction patterns.** Click-to-edit, inline dropdowns, slide-out modals, expandable sections — all behave the same way everywhere.
+
+### How to Apply These Principles
+When building any component, Claude Code should ask:
+1. Can the user accomplish this with fewer clicks?
+2. Would a brand new employee understand what they're looking at?
+3. Is the most important information visible without scrolling?
+4. Are there actions shown that can't actually be taken right now?
+5. Does this look and behave like the same product as other modules?
+
+If the answer to any of these is wrong, fix it before moving on.
 
 ---
 
@@ -537,6 +605,7 @@ Already built (see AI ASSIST LAYER section above)
 - Inline styles are fine for now
 - Pretty good and shipped > perfect and planned
 - AI features use mock data now, real API calls later
+- **Every component must pass the 5 UX principle checks (see UI/UX DESIGN PRINCIPLES section)**
 
 ---
 
