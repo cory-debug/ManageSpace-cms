@@ -1,6 +1,6 @@
 # ManageSpace - Master Context Document
 
-**Last Updated:** February 8, 2026 (afternoon — UX principles + gap analysis + architecture)
+**Last Updated:** February 12, 2026 (ECRI + Vacant Pricing modules added, Morningstar call findings integrated)
 **Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
 **Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
@@ -8,9 +8,10 @@
 
 ## CRITICAL CONTEXT: SURVIVAL MODE
 
-**Timeline:** 10 months until runway exhausted
+**Timeline:** ~10 months until runway exhausted (~December 2026)
 **Imperative:** Ship working products FAST to generate revenue and secure next customers/investors
 **Strategy:** Build base module demos to sell platform vision while delivering customer commitments
+**Active modules:** Communications Hub (demo-ready), ECRI (build in progress), Vacant Unit Pricing (next)
 
 ---
 
@@ -82,10 +83,12 @@ If the answer to any of these is wrong, fix it before moving on.
 
 ---
 
-## CURRENT BUILD: COMMUNICATIONS HUB
+## MODULE 1: COMMUNICATIONS HUB (Demo-Ready)
 
 ### What It Is
 A helpdesk inbox UI for Storage Vault (investor + customer) — their staff use it to manage inbound calls, emails, and SMS from storage tenants. Paul is building the backend (Twilio integration), Cory is building the frontend.
+
+### Status: Demo-ready as of Feb 12. Demo target was Feb 14, 2026.
 
 ### Current State (as of Feb 8, evening)
 
@@ -406,45 +409,190 @@ When ready to evaluate, top contenders:
 
 ---
 
+## MODULE 2: ECRI — Existing Customer Rent Increase (Active Build)
+
+### What It Is
+Revenue management tool for Morningstar Storage — automates Brian Richardson's ECRI workflow. Produces fixed-percentage rent increase recommendations using a 4-tier formula, grouped by facility and unit group. DMs review and override before notices go out.
+
+**Full build plan:** `docs/ecri-module-plan.md` (504 lines, comprehensive)
+**Open questions:** `docs/open-questions-remaining.md`
+
+### Morningstar's 4-Tier Formula (Confirmed Feb 12, 2026)
+
+```
+Step 1: trialRate = currentRent x 1.20  (20% baseline for ALL tier evaluations)
+Step 2: newRateDeltaToMedian = (trialRate - unitGroupMedian) / unitGroupMedian
+Step 3: tenantVsStreet = (currentRent - streetRate) / streetRate
+
+TIER 1 — 40%: IF newRateDeltaToMedian < -0.20 AND unitGroupOccupancy > 0.75
+TIER 2 — 10%: ELSE IF newRateDeltaToMedian > 0.75
+TIER 3 — 15%: ELSE IF tenantVsStreet > 0.15 AND newRateDeltaToMedian > 0.15
+TIER 4 — 20%: ELSE (default)
+```
+
+### Key Confirmed Rules
+- **20% trial rate for ALL tiers** — evaluation always starts with 20% increase, then assigns the matching tier's %
+- **Median = MEDIAN of all occupied rents in unit group, INCLUDES the tenant being evaluated**
+- **Eligibility = time since last increase ONLY** (12 months). NOT lease date, no min tenure, no min gap-to-market
+- **Street rate ceiling is manual judgment** — no hard cap in formula. Flag when 40% pushes above street, let DMs decide
+- **Override frequency ~20%** (1 in 5 tenants). Range: 10%–50%
+- **Timing: 5–6 weeks before effective date.** Brian finishes recs ~2 weeks before; DMs get ~1 week to review
+- **30-day notice** goes out 1st of month before effective date
+
+### Override Reasons (Confirmed)
+1. Undesirable building section (near road, noisy, poor AC)
+2. Business tenant relationship (DM wants to preserve)
+3. High-bay risk assessment (large base rent = large $ increase)
+4. Street rate ceiling (most common — 40% pushes above street)
+5. On the fence / need DM input
+6. Other (free text)
+
+### Special Handling Flags
+- **Post-lease-up:** First increase can be 85–100%. Manual/"white glove" — flag with `isLeaseUp` + duration
+- **Seasonal low-rate move-ins:** Tenure ~1yr + (currentRent/median) < 0.50 → 50%+ starting point
+- **New acquisitions:** Use lease date to batch all tenants. Go through full rent roll
+- **Multi-unit tenants:** Flag only, no formula adjustment. Want cross-month detection (Phase 2)
+
+### Codebase Divergence
+Current RevMan engine uses a fundamentally different model (variable gap-capture %, weighted comp market rate, tenure/occupancy adjustments). **Build Morningstar engine as a NEW calculation path** — `calculationEngine: 'morningstar' | 'revman'` company setting. See `docs/ecri-module-plan.md` Section 5 for full comparison table.
+
+### ECRI MVP Scope (April 1 Go-Live)
+- 4-tier formula engine
+- Facility list grouped by fund → tenant table grouped by unit group
+- Tier assignment with full rationale display
+- Approve / Modify / Skip workflow with audit trail and reason capture
+- Multi-unit flag, lease-up flag, seasonal low-rate flag, above-street warning
+- DM review workflow (Brian → DMs → finalize)
+- CSV export for SiteLink upload
+- Basic ECRI history, non-storage unit visibility tab, batch summary
+
+---
+
+## MODULE 3: VACANT UNIT PRICING (Next Build)
+
+### What It Is
+Weekly pricing tool for setting street rates on vacant units. Brian's process is **activity-driven, not formula-driven** — it's a structured analysis workflow with judgment at the end. Our module replicates this workflow and surfaces the right data.
+
+**Full build plan:** `docs/vacant-pricing-module-plan.md` (540 lines, comprehensive)
+
+### Brian's Weekly Workflow (8 Steps)
+1. **Store health check** — 3-year occupancy trend chart with street + achieved rate lines
+2. **90-day recent trend** — compare current month to prior 3 months + same season last year
+3. **Activity analysis** — 7-day, 14-day, 30-day move-in/move-out/net per facility
+4. **Unit group trending** — drill into individual unit groups, find which are trending up/down
+5. **Pricing decision** — two modes based on occupancy:
+   - **>90% occupied → Price to activity** (less weight on comps, capture the demand)
+   - **<75% occupied → Price to market** (heavy weight on competitor rates)
+6. **Achieved rate gap closure** — push street rates toward achieved to close the gap
+7. **Increment sizing** — based on unit size (small=$5, large=$30-50), volume (more units = smaller increments), and last change amount
+8. **Competitor analysis** — A/B/C tier comps (combined quality + style + distance, NOT distance-only)
+
+### Competitor Tier System
+- **A = Primary:** Top comp across all factors. Similar quality, close proximity
+- **B = Secondary:** Still a real competitor. Could be quality but farther, or closer but mid-tier
+- **C = Tertiary:** On the radar but not a major factor
+- Weight: A=1.0, B=0.6, C=0.25 (configurable)
+- Mix is ~50% REITs, ~50% local/mom-and-pop
+
+### Unit Group Stacking Hierarchy
+Ground > Interior (higher floors) > Drive-up (outside, no CC, security concerns)
+System must flag hierarchy violations. Never let a less-desirable group price above a more-desirable one.
+
+### Vacant Pricing MVP Scope
+- Facility list with occupancy indicators and attention flags
+- Store health chart (3-year occupancy + street + achieved)
+- Activity dashboard (7/14/30 day move-in/move-out/net)
+- Unit group pricing table with recommendation engine (directional: increase/decrease/hold + amount)
+- Competitor table with A/B/C tiers (manual entry for V1)
+- Pricing hierarchy display + violation flags
+- Price change history log, CSV export
+
+---
+
+## MORNINGSTAR RELATIONSHIP
+
+### Key Contacts
+- **Brian Richardson** — Director of Revenue Management. Primary contact for ECRI + Vacant Pricing. Weekly calls.
+- **Bob Dunworth** — VP/SVP level. Strategic decisions, investment context. Attended Feb 4 call.
+- **Craig** — Technology/data lead. SiteLink integration, data exports, historical data.
+- **Matt** — Operations. Attended initial Jan 29 call.
+
+### Call History
+| Date | Attendees | Key Outcomes |
+|------|-----------|--------------|
+| Jan 29, 2026 | Bob, Craig, Matt | Initial kickoff. High-level requirements. ECRI + pricing overview |
+| Feb 4, 2026 | Brian, Bob | Deep dive on ECRI formula. 4-tier structure revealed. Vacant pricing workflow |
+| Feb 12, 2026 | Brian | **Critical call.** Confirmed: 20% trial for all tiers, median includes self, eligibility = last increase only, override frequency/reasons, fund-level adjustments, special handling flags, timing, non-storage exclusions |
+| **Feb 19, 2026** | Brian (scheduled) | **1:15 PM ET.** Agenda: Excel validation results, fund-level tier mechanics, SiteLink upload format, comp data sources, pricing increments, user roles |
+
+### Planning Docs (Created Feb 12)
+All at project root `docs/`:
+- `docs/ecri-module-plan.md` — Complete ECRI build plan (504 lines): 4-tier formula, 10 operational logic sections, 5 screens, data reqs, MVP/Phase 2/3 scope, divergence table, validation plan, 18 key quotes
+- `docs/vacant-pricing-module-plan.md` — Complete vacant pricing build plan (540 lines): Brian's 8-step weekly workflow, recommendation engine pseudocode, comp tiers, 4 screens, MVP scope
+- `docs/open-questions-remaining.md` — Status tracker: 8 resolved, 2 partial, 4 unaddressed, 15 remaining gaps with assumptions + next steps, Feb 19 call agenda
+
+---
+
 ## PROJECT LOCATION
 
 ```
-/Users/cs/Documents/ManageSpace-cms/
+/Users/corysylvester/Documents/ManageSpace/
 ├── CLAUDE.md                              ← THIS FILE (root)
 ├── communications-hub/
-│   ├── communications-hub/                ← ACTUAL PROJECT (nested — this is where code lives)
+│   ├── communications-hub/                ← Comms Hub project (nested — code lives here)
 │   │   ├── src/
-│   │   │   ├── App.tsx                    ← Imports CommunicationsHub
-│   │   │   ├── CommunicationsHub.tsx      ← MAIN COMPONENT (all UI code)
+│   │   │   ├── App.tsx
+│   │   │   ├── CommunicationsHub.tsx      ← MAIN COMPONENT (~1400 lines, all UI code)
 │   │   │   ├── main.tsx
 │   │   │   └── index.css
-│   │   ├── index.html
-│   │   ├── package.json                   ✅ Fixed (type: module, dev: vite)
+│   │   ├── package.json
 │   │   ├── vite.config.ts
-│   │   ├── tailwind.config.js
-│   │   ├── postcss.config.js
-│   │   ├── tsconfig.json
-│   │   └── STORAGE_VAULT_COMMS_UI_SPEC.md
+│   │   └── tsconfig.json
 │   ├── package.json                       ← OUTER (ignore, wrong level)
-│   ├── index.html                         ← OUTER (ignore, wrong level)
 │   └── node_modules/
-├── revman/
+├── ecri/                                  ← ECRI module project (React + TS + Vite)
+│   ├── src/
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+├── revman/                                ← ⚠️ GIT SUBMODULE (see note below)
+│   ├── docs/                              ← Call transcripts, specs, Brian's calc logic
+│   │   ├── revman-morningstar-brichardson-2-12-26.md
+│   │   ├── revman-morningstar-brichardson-bdunworth-2-4-26.md
+│   │   ├── brian-ecri-calculation-logic.md
+│   │   ├── morningstar-ecri-spec.md
+│   │   ├── VACANT_PRICING_LOGIC.md
+│   │   └── BRIEF.md
+│   └── app/                               ← RevMan backend (React Router 7 + SSR + SQLite/Drizzle)
+├── docs/                                  ← Planning docs (tracked in main repo)
+│   ├── ecri-module-plan.md
+│   ├── vacant-pricing-module-plan.md
+│   ├── open-questions-remaining.md
+│   └── ecri/
+│       ├── ECRI_SPEC.md
+│       └── ECRI_GAP_ANALYSIS.md
 ├── shared/
-└── docs/
+└── DEMO_SCRIPT.md
 ```
 
-**IMPORTANT:** The actual project is NESTED at `communications-hub/communications-hub/`. Always `cd` into the inner folder before running commands.
+**IMPORTANT:** Comms Hub is NESTED at `communications-hub/communications-hub/`. Always `cd` into the inner folder before running commands.
 
-### Tech Stack
-- React 19.2.4
-- TypeScript 5.9.3
-- Vite 7.3.1 (Rolldown-Vite)
-- Tailwind CSS 4.1.18 (installed but UI uses inline styles currently)
-- No routing library yet (single-page app for now)
+**IMPORTANT:** `revman/` is a git submodule (mode 160000) in the parent ManageSpace repo. You CANNOT `git add` files inside `revman/` from the parent repo. To commit files that reference revman content, copy them to `docs/` at the project root instead.
 
-### Running the Dev Server
+### Tech Stack (Comms Hub + ECRI)
+- React 19 + TypeScript + Vite 7 (Rolldown-Vite)
+- Comms Hub: inline styles, single-file component, no routing
+- ECRI: separate project at `ecri/`, same stack
+- RevMan backend: React Router 7 + SSR + SQLite + Drizzle ORM
+
+### Running Dev Servers
 ```bash
-cd /Users/cs/Documents/ManageSpace-cms/communications-hub/communications-hub
+# Comms Hub
+cd /Users/corysylvester/Documents/ManageSpace/communications-hub/communications-hub
+npx vite
+
+# ECRI
+cd /Users/corysylvester/Documents/ManageSpace/ecri
 npx vite
 ```
 
@@ -578,25 +726,28 @@ Cubby's comms product shows:
 When Cory opens Claude Code in Cursor terminal:
 
 1. **Read this CLAUDE.md first**
-2. **Work in the inner folder:** `cd communications-hub/communications-hub`
+2. **Check which module you're working on** — different project directories
 3. **Edit files directly** — no copy-pasting
-4. **Run dev server:** `npx vite`
+4. **Run dev server:** `npx vite` from the correct project dir
 5. **Build incrementally** — one feature at a time
 6. **Test in browser** — Vite hot-reloads
+7. **When committing:** Files in `revman/` can't be added from parent repo (submodule). Use `docs/` instead.
 
 ### Current Priority (Build Order)
-**Phase A — Gap fixes (this week):**
-1. A1: Missed call handling (queue variant + auto-case creation)
-2. A2: Outbound call button (Call Customer + confirmation + Active Call View reuse)
-3. A3: Real-time notification mock (toast + unread dots + tab badge updates)
-4. A4: System/automated communications in timeline (sentBy badges)
-5. A5: SLA indicators on cases (green/yellow/red based on response time)
-6. A6: Skills/team labels on queue items
 
-**Phase B — AI assist (next week):**
-Already built (see AI ASSIST LAYER section above)
+**Comms Hub — Demo-ready. Phase A gap fixes complete. Phase B AI assist complete.**
+- Next: Connect to Paul's backend for real Twilio integration
 
-**After gaps closed:** Connect to Paul's backend for real Twilio integration.
+**ECRI Module — Active build. Target: April 1 go-live.**
+1. Build 4-tier formula engine (see `docs/ecri-module-plan.md` Section 1)
+2. Facility list + tenant recommendation table (Section 2, Screen 1)
+3. Override workflow with reason capture
+4. Batch summary screen
+5. CSV export for SiteLink upload
+6. Validate against Brian's Excel (Column Z) before Feb 19 call
+
+**Vacant Pricing — Next after ECRI MVP.**
+- See `docs/vacant-pricing-module-plan.md` for full plan
 
 ### Build Philosophy
 - Ship working features fast
@@ -624,12 +775,15 @@ Already built (see AI ASSIST LAYER section above)
 - **Stephen Bluck** — Engineer, AI workflows
 
 ### Key Customers
-1. **Morningstar Storage** (US) — ~83 facilities, April 1 go-live
-2. **Storage Vault Canada** — ~400 facilities, INVESTOR
+1. **Morningstar Storage** (US) — ~83 facilities, ~50,000–60,000 tenants. April 1 go-live for ECRI. Primary contact: Brian Richardson (revenue management). Uses SiteLink as PMS. Brian currently runs ECRI in Excel + Qlik dashboards for pricing.
+2. **Storage Vault Canada** — ~400 facilities, INVESTOR. Comms Hub customer.
 
 ### Critical Dates
-- **April 1, 2026:** Morningstar go-live
-- **Feb 14, 2026:** Comms Hub demo target
+- **Feb 14, 2026:** Comms Hub demo (target met — demo-ready)
+- **Feb 19, 2026:** Next call with Brian Richardson, 1:15 PM ET (agenda in `docs/open-questions-remaining.md`)
+- **~Feb 14–20, 2026:** Brian pulls April ECRI data, runs formula
+- **Mar 1, 2026:** 30-day notice letters go out for April ECRIs
+- **April 1, 2026:** Morningstar ECRI go-live (new rates effective)
 - **~December 2026:** Runway exhausted
 
 ---
