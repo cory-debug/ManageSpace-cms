@@ -1,6 +1,6 @@
 # ManageSpace - Master Context Document
 
-**Last Updated:** February 12, 2026 (ECRI + Vacant Pricing modules added, Morningstar call findings integrated)
+**Last Updated:** February 12, 2026 (evening — design system reference, key decisions, formula validation complete)
 **Purpose:** Single source of truth for ALL Claude instances (Claude Code, Cursor AI, Claude.ai)
 **Audience:** Any AI assistant working with Cory Sylvester on ManageSpace
 
@@ -453,6 +453,15 @@ TIER 4 — 20%: ELSE (default)
 - **New acquisitions:** Use lease date to batch all tenants. Go through full rent roll
 - **Multi-unit tenants:** Flag only, no formula adjustment. Want cross-month detection (Phase 2)
 
+### Formula Validation — COMPLETE
+**29/29 formula rows = 100% match** against Brian's Cornelius Excel (Column Z). See `docs/ecri-formula-validation.md`. Key finding: Tier 1 (40%) was overridden in every case — it's an attention flag, not a final recommendation.
+
+### Key Decisions (Confirmed)
+- **Fund-level tiers:** Independent tier % overrides per fund, no auto-proportional. ~5 funds, changes annually. Phase 2.
+- **Occupancy threshold:** Ship with binary 75%, add configurability in settings UI. Phase 2 for gradient.
+- **Activity data:** Flows through ManageSpace platform (SiteLink → ManageSpace → modules). Include in Paul's data requirements doc.
+- **Competitor data:** StorTrack feed or custom ManageSpace web scraper — we provide the data, not manual entry.
+
 ### Codebase Divergence
 Current RevMan engine uses a fundamentally different model (variable gap-capture %, weighted comp market rate, tenure/occupancy adjustments). **Build Morningstar engine as a NEW calculation path** — `calculationEngine: 'morningstar' | 'revman'` company setting. See `docs/ecri-module-plan.md` Section 5 for full comparison table.
 
@@ -503,7 +512,7 @@ System must flag hierarchy violations. Never let a less-desirable group price ab
 - Store health chart (3-year occupancy + street + achieved)
 - Activity dashboard (7/14/30 day move-in/move-out/net)
 - Unit group pricing table with recommendation engine (directional: increase/decrease/hold + amount)
-- Competitor table with A/B/C tiers (manual entry for V1)
+- Competitor table with A/B/C tiers (data from StorTrack feed or ManageSpace scraper; tier assignment manual)
 - Pricing hierarchy display + violation flags
 - Price change history log, CSV export
 
@@ -598,9 +607,56 @@ npx vite
 
 ---
 
-## ARCHITECTURE: SINGLE-FILE COMPONENT
+## DESIGN SYSTEM REFERENCE (From Comms Hub — Reuse in ALL Modules)
 
-All UI code is in `src/CommunicationsHub.tsx`. Intentional for speed — break into separate files later.
+The Comms Hub established the ManageSpace design system. **Every new module must match these patterns exactly.** Reference: `communications-hub/communications-hub/src/CommunicationsHub.tsx`.
+
+### Approach
+- **Pure inline React styles** — no CSS modules, no Tailwind classes (though Tailwind is installed)
+- **Single-file component** pattern — all UI in one file for speed. Break apart later.
+- **All color values, spacing, typography hardcoded inline** — copy exact hex values
+
+### Layout Structure (Same for ALL Modules)
+1. **Header bar:** White bg, border-bottom, logo + title left, status indicators + avatar right. Padding: 14px 24px.
+2. **Tab navigation:** White bg, border-bottom, horizontal TabButton components with counts. Padding: 12px 24px.
+3. **Two-panel main:** Flex container, gap: 16px, padding: 16px.
+   - **Left panel:** 380px fixed width, scrollable list of cards
+   - **Right panel:** flex: 1, min-width: 400px, white card with border-radius: 12px
+
+### Color Tokens (Use These Exact Values)
+- **Background:** #F1F5F9 | **Surface/Cards:** #fff | **Border:** #E2E8F0
+- **Text primary:** #0F172A | **Text secondary:** #64748B | **Text tertiary:** #94A3B8
+- **Status:** Open=#3B82F6/bg:#EFF6FF, InProgress=#F59E0B/bg:#FFFBEB, Waiting=#FB923C/bg:#FFF7ED, Resolved=#10B981/bg:#ECFDF5, Closed=#6B7280/bg:#F9FAFB
+- **Priority:** Urgent=#EF4444/bg:#FEF2F2, High=#F59E0B/bg:#FFFBEB, Medium=#3B82F6/bg:#EFF6FF, Low=#6B7280/bg:#F9FAFB
+- **AI accent:** #6366F1/bg:#F5F3FF | **System:** #64748B/bg:#F1F5F9
+
+### Typography
+- **Font:** `'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`
+- **Mono:** `'SF Mono', 'Menlo', 'Monaco', monospace`
+- **Sizes:** 28/20/18px (headings), 16/14/13px (body), 12/11/10px (labels/badges)
+- **Weights:** 700 (bold headings), 600 (semibold labels/buttons), 500 (medium), 400 (body)
+
+### Component Patterns (Copy from Comms Hub)
+- **Badge:** Pill shape (border-radius: 9999px), 11px uppercase, font-weight: 600, color + bg props
+- **TabButton:** 8px 16px padding, 13px font, active = #0F172A bg + white text, inactive = transparent + #64748B
+- **Cards:** White bg, border-radius: 10px, border: 1px solid #E2E8F0, padding: 14px 16px
+- **Modals:** Fixed overlay, centered card, border-radius: 16px, shadow: 0 25px 50px -12px rgba(0,0,0,0.25)
+- **Buttons:** border-radius: 8px, font-weight: 600, transition: all 0.15s ease
+
+### Spacing Rhythm
+- Gaps: 4px/6px (tight), 8px/10px/12px (default), 16px/20px/24px (comfortable)
+- Border-radius: 6px (inputs), 8px (buttons), 10px (cards), 12px (panels), 9999px (badges)
+
+### Utility Functions to Replicate
+- `getPriorityConfig(priority)` → `{ color, bg, label }`
+- `getStatusConfig(status)` → `{ color, bg, label }`
+- Helper for each domain-specific badge (tier badges for ECRI, occupancy badges for pricing, etc.)
+
+---
+
+## ARCHITECTURE: COMMS HUB (SINGLE-FILE COMPONENT)
+
+All Comms Hub UI code is in `src/CommunicationsHub.tsx`. Intentional for speed — break into separate files later.
 
 ### Updated Data Model
 ```typescript

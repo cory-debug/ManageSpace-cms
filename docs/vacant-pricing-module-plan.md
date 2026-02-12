@@ -388,28 +388,34 @@ function recommendStreetRate(unitGroup, facilityTrend, activity, competitors):
 
 ## 3. Data Requirements
 
-### 3.1 From PMS (SiteLink → ManageSpace Sync)
+### 3.1 From PMS (SiteLink → ManageSpace Platform → Pricing Module)
 
-| Field | Source | Notes |
-|-------|--------|-------|
-| Unit group definition | SiteLink | Size, CC, floor, access |
-| Total units per group | SiteLink | |
-| Occupied units per group | SiteLink | |
-| Street rate per group | SiteLink / manual | Brian sets weekly |
-| Move-in dates (recent) | SiteLink | For 7/14/30 day activity |
-| Move-out dates (recent) | SiteLink | For 7/14/30 day activity |
-| Historical occupancy | SiteLink | Monthly, 3-year lookback |
-| Current tenant rents | SiteLink | For achieved rate calc |
-| Unit attributes | SiteLink | Power, alarm (where broken out) |
+Data flows through ManageSpace's platform: SiteLink → ManageSpace sync → available to all modules. Paul's team must ensure these fields are captured in the sync.
+
+| Field | Source | Notes | Paul's Requirement |
+|-------|--------|-------|--------------------|
+| Unit group definition | SiteLink | Size, CC, floor, access | Standard |
+| Total units per group | SiteLink | | Standard |
+| Occupied units per group | SiteLink | | Standard |
+| Street rate per group | SiteLink / manual | Brian sets weekly | Standard |
+| Move-in dates (recent) | SiteLink | For 7/14/30 day activity | **CRITICAL — must include per-tenant dates** |
+| Move-out dates (recent) | SiteLink | For 7/14/30 day activity | **CRITICAL — must include per-tenant dates** |
+| Historical occupancy | SiteLink | Monthly, 3-year lookback | **Must extract or derive from tenant history** |
+| Historical street rates | SiteLink / manual | Monthly, 3-year lookback | **For store health chart** |
+| Historical achieved rates | Calculated | Monthly, 3-year lookback | **Derive from tenant rent snapshots** |
+| Current tenant rents | SiteLink | For achieved rate calc | Standard |
+| Unit attributes | SiteLink | Power, alarm (where broken out) | Phase 2 |
 
 ### 3.2 From Competitor Sources
 
 | Field | Source | Notes |
 |-------|--------|-------|
-| Competitor name + address | Manual / scraper | |
-| Competitor tier (A/B/C) | Manual | Combined quality + style + distance |
-| Rates by unit size | Manual / scraper | Updated as available |
-| Sold-out status | Scraper | If size is unavailable |
+| Competitor name + address | StorTrack feed or ManageSpace scraper | Auto-populated |
+| Competitor tier (A/B/C) | Manual | Combined quality + style + distance — one-time setup per competitor |
+| Rates by unit size | StorTrack feed or ManageSpace scraper | Auto-refreshed |
+| Sold-out status | StorTrack feed or ManageSpace scraper | If size is unavailable |
+
+**Decision:** Competitor rate data will come from either an external data feed (StorTrack) or a custom ManageSpace web scraper — we provide the data, not manual entry. A/B/C tier classification remains manual (Brian's team assigns based on quality + style + distance).
 
 ### 3.3 Calculated Fields
 
@@ -452,7 +458,7 @@ function recommendStreetRate(unitGroup, facilityTrend, activity, competitors):
 - [ ] Occupancy-based pricing mode indicator (activity vs market vs balanced)
 - [ ] Basic recommendation engine (directional: increase/decrease/hold + amount)
 - [ ] Override field per unit group (Final = Override ?? Recommended)
-- [ ] Competitor table with A/B/C tiers and rates (manual entry)
+- [ ] Competitor table with A/B/C tiers and rates (data from StorTrack feed or ManageSpace scraper; tier assignment manual)
 - [ ] Weighted comp average per unit size
 - [ ] Pricing hierarchy display (ground > interior > drive-up)
 - [ ] Hierarchy violation flags
@@ -460,7 +466,6 @@ function recommendStreetRate(unitGroup, facilityTrend, activity, competitors):
 - [ ] CSV export of current pricing decisions
 
 **Cut for speed:**
-- Automated comp scraping (manual entry for V1)
 - Unit-level pricing (premiums for power, alarm, proximity)
 - Predictive demand modeling
 - Revenue optimization (expected move-ins × price)
@@ -470,7 +475,7 @@ function recommendStreetRate(unitGroup, facilityTrend, activity, competitors):
 
 - [ ] Unit-level pricing segmentation (power, alarm, Blue Star, conversion)
 - [ ] Floor/access premium configuration
-- [ ] Automated competitor rate scraping
+- [ ] Automated competitor rate scraping (if not done in MVP via StorTrack)
 - [ ] Seasonal demand overlay (portfolio baseline + facility adjustment)
 - [ ] Price elasticity model (move-ins vs price at portfolio level)
 - [ ] Optimal price calculation (revenue-maximizing recommendation)

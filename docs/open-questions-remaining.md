@@ -1,23 +1,26 @@
 # Open Questions Remaining — Post Feb 12 Call
 
-**Last Updated:** February 12, 2026
-**Context:** After two calls with Brian (Feb 4, Feb 12) and the initial interview (Jan 29 with Bob, Craig, Matt), most critical ECRI questions are resolved. This doc captures what's still open, why it matters, what to assume without answers, and recommended next steps.
+**Last Updated:** February 12, 2026 (evening — post Excel validation)
+**Context:** After two calls with Brian (Feb 4, Feb 12), the initial interview (Jan 29 with Bob, Craig, Matt), and validation against Brian's Cornelius Excel, most critical ECRI questions are resolved. This doc captures what's still open, why it matters, what to assume without answers, and recommended next steps.
 **Next call:** Feb 19, 2026 at 1:15 PM ET with Brian
+**Validation report:** `docs/ecri-formula-validation.md` — 29/29 formula rows match (100%)
 
 ---
 
 ## Status of Previously Open Questions
 
-### Resolved (Feb 12 Call)
+### Resolved (Feb 12 Call + Excel Validation)
 
 | # | Question | Answer | Confidence |
 |---|----------|--------|------------|
 | A2 | "New rate" for Tier 2 — 20% or tier's own %? | **20% trial for all tiers** | Confirmed |
 | A3 | "New rate" for Tier 3 — 20% or 15%? | **20% trial for all tiers** | Confirmed |
+| A4 | Percent delta formula sign convention | **(rate - reference) / reference**. Negative = below, positive = above. Validated against Column Z Excel formulas. | Confirmed (Excel) |
 | A5 | Street rate ceiling — cap at street or manual? | **Manual judgment only** — no hard rule | Confirmed |
 | B1 | Median — include or exclude current tenant? | **Include** current tenant | Confirmed |
+| B3 | Excel Column Z example rows | **Extracted and validated all 50 Cornelius tenants.** 29 formula rows = 100% match. 21 manual overrides analyzed. See `docs/ecri-formula-validation.md` | Confirmed (Excel) |
 | C1 | New acquisitions — how identified/handled? | **Use lease date** to batch all tenants into one cohort | Confirmed |
-| D1 | Override frequency | **~20% (1 in 5)**, range 10–50% | Confirmed |
+| D1 | Override frequency | **~20% (1 in 5)**, range 10–50%. Cornelius actual: 42% (21/50) — high end, likely due to many seasonal low-rate tenants | Confirmed + validated |
 | D2 | Multi-unit rule — formal or judgment? | **Flag only**, no formula | Confirmed |
 | D4 | Evaluation timing | **5–6 weeks before effective date**, DMs get ~1 week review | Confirmed |
 
@@ -25,69 +28,56 @@
 
 | # | Question | What We Know | What's Still Open |
 |---|----------|-------------|-------------------|
-| A1 | 75% occupancy — hard cutoff or gradient? | Hard cutoff **for now**, but Brian thinks it should be gradient based on store performance, unit group volume, unit size | Exact gradient logic TBD — safe to ship with binary 75% and iterate |
-| C3 | Post-lease-up tagging and default % | Lease-up = manual/white-glove, 85–100% increases. Need facility flag + duration field. Seasonal low-rate = 50%+ starting point | Exact lease-up duration for Ortiz vs Crossing not confirmed. Seasonal flag threshold (tenure ~1yr + 50% spread) is Brian's estimate, not tested |
+| A1 | 75% occupancy — hard cutoff or gradient? | Hard cutoff **for now**, but Brian thinks it should be gradient based on store performance, unit group volume, unit size. Excel validation confirms: Tier 1 occupancy gate uses `> 0.75` (cell AR3). | Exact gradient logic TBD — safe to ship with binary 75% and iterate |
+| C3 | Post-lease-up tagging and default % | Lease-up = manual/white-glove, 85–100% increases. Need facility flag + duration field. Seasonal low-rate = 50%+ starting point. **Excel validates:** 7 seasonal low-rate tenants at Cornelius overridden to 45–60% (tenure ~0.8yr, rates $49–$99 vs street $89–$199). | Exact lease-up duration for Ortiz vs Crossing not confirmed. Seasonal flag threshold confirmed by data: tenure < 1.2yr + rate < 80% of street |
 
 ### Not Yet Addressed
 
 | # | Question | Status |
 |---|----------|--------|
-| A4 | Percent delta formula sign convention | Assumed: (rate - reference) / reference. Negative = below. Positive = above. Validate against Column Z. |
-| B2 | Unit group = our unit type exactly? | Assumed yes (size + CC + floor + access). Brian hasn't contradicted this. Need to verify no further splits (e.g., by building). |
-| B3 | Excel Column Z example rows | Brian confirmed formula is in Z starting row 10+. We have the Cornelius file — need to extract and validate. |
-| D3 | Tenure breakpoints for manual decisions | Brian says longer tenure = typically higher payer = lower increase. No formal breakpoints. Flag only. |
+| B2 | Unit group = our unit type exactly? | Assumed yes (size + CC + floor + access). Cornelius Excel unit names confirm pattern: "Drive To Your Door 10.0x10.0", "Heated & Cooled 10.0x10.0", "Standard 5.0x5.0". Need to verify no further splits (e.g., by building). |
+| D3 | Tenure breakpoints for manual decisions | Brian says longer tenure = typically higher payer = lower increase. No formal breakpoints. Cornelius data confirms: long-tenure tenants (6–10yr) in low-occ groups get dialed to 10–12%. Flag only. |
 
 ---
 
 ## ECRI Module — Remaining Gaps
 
-### Gap 1: Exact Formula Validation Against Excel
+### ~~Gap 1: Exact Formula Validation Against Excel~~ — RESOLVED
 
-**Status:** We have the Cornelius ECRI template file. Column Z has the formula from row 10+.
+**Status:** COMPLETE. Extracted all 50 Cornelius tenants from `Mstar ECRI Template - Calc Tool.xlsx`. Full results in `docs/ecri-formula-validation.md`.
 
-**Why it matters:** The 4-tier logic has been described verbally across two calls, but we haven't verified our pseudocode produces identical output to Brian's Excel for a real tenant row. One misplaced comparison operator or threshold value changes which tenants land in which tier.
+**Result: 29/29 formula rows = 100% match. Zero mismatches.**
 
-**Assumption without answer:** Our pseudocode matches Brian's description. Build it, then validate against the Excel.
+**Key findings from validation:**
+- Column Z formula decoded: `IF(AND(%Delta < -0.20, Occ > 0.75), 0.40, IF(%Delta > 0.75, 0.10, IF(AND(TvS > 0.15, %Delta > 0.15), 0.15, 0.20)))`
+- Tier thresholds stored in configurable cells: AQ2=-0.20, AR3=0.75, AP2=0.75, AP3=0.10, AQ3=0.40, AP4=0.15
+- 21 of 50 tenants (42%) were manually overridden by Brian — higher than his "1 in 5" estimate
+- Override patterns: seasonal low-rate → 45–60%, low-occ → 10–12%, above-street → 12–18%
+- Tier 1 (40%) was overridden in every single case — it's effectively an "attention flag" not a final recommendation
 
-**Next step:** Extract 5–10 rows from the Cornelius file where Column Z formula is intact. Run through our engine. Compare. Bring discrepancies to Feb 19 call.
+**Next step:** Present results to Brian on Feb 19. Ask: "Is Cornelius typical, or does it have more overrides than usual?"
 
-**Priority:** HIGH — do this before Feb 19 call.
-
----
-
-### Gap 2: Fund-Level Tier Adjustment Mechanics
-
-**Status:** Brian wants fund-level tier percentage adjustments (e.g., change baseline from 20% to 25% for a specific fund) with store-level overrides within a fund. He also suggested tiers might move together proportionally when the baseline changes.
-
-**Why it matters:** This affects how the settings UI works and whether we need a "lift factor" or just independent tier overrides per fund.
-
-**What we don't know:**
-1. Should other tiers auto-adjust when baseline changes? (Brian said "probably, yeah" but hadn't thought deeply about it)
-2. How many funds does Morningstar have? How often would they change fund-level settings?
-3. Are there specific funds right now that need different baselines? Which ones?
-
-**Assumption without answer:** Build independent tier percentage overrides per fund (no auto-proportional adjustment). Simpler to implement, easier to understand. If Brian later wants proportional adjustment, add it as a "lock ratio" toggle.
-
-**Next step:** Ask Brian on Feb 19: "For fund-level tier adjustments — do you want each tier independently adjustable, or should they auto-scale when you change the baseline? And which funds need different settings right now?"
-
-**Priority:** MEDIUM — Phase 2 feature, but good to get clarity before building settings UI.
+**Priority:** ~~HIGH~~ DONE.
 
 ---
 
-### Gap 3: Occupancy Threshold Gradient
+### Gap 2: Fund-Level Tier Adjustment Mechanics — DECISION MADE
 
-**Status:** 75% is the current hard cutoff for Tier 1 eligibility. Brian thinks it should be smarter — varying by store occupancy, unit group volume, and unit size.
+**Status:** Decision: **Independent tier percentage overrides per fund (no auto-proportional adjustment).** Morningstar has ~5 funds. Fund-level settings would change infrequently — annually at most. Store-level overrides within a fund remain Phase 2.
 
-**Why it matters:** A binary 75% threshold may be too crude for an 83-facility portfolio with very different store profiles. Small unit groups (3 units) behave differently from large ones (100 units) at the same occupancy percentage.
+**Decision rationale:** Auto-proportional adds complexity without clear value. Brian hasn't thought deeply about it. Independent overrides are simpler to build, easier to explain, and cover the use case. If Brian later wants proportional scaling, add a "lock ratio" toggle.
 
-**What we don't know:**
-1. What dimensions should the gradient consider? (Brian mentioned store occupancy, unit group volume, unit size)
-2. What would the actual gradient look like? (e.g., for small unit groups, accept 66% because 2/3 occupied is actually tight)
-3. Is this something Brian wants to configure or wants us to model?
+**Next step:** Still confirm with Brian on Feb 19 which funds (if any) need different baselines right now.
 
-**Assumption without answer:** Ship with binary 75% (confirmed as current practice). Add configuration capability so Brian can change the threshold per facility or unit group size range when ready. Don't build a gradient engine until Brian defines what "gradient" means to him.
+**Priority:** Phase 2 feature. Decision locked for build.
 
-**Next step:** Not urgent for MVP. Revisit in Phase 2 after Brian has used the system and can identify where 75% is too crude.
+---
+
+### Gap 3: Occupancy Threshold Gradient — DECISION MADE
+
+**Status:** Decision: **Ship with binary 75% (confirmed as current practice) but build configurability into the settings UI.** Allow Brian to change the threshold per facility or per unit group size range from the ECRI Settings screen. Don't build a gradient engine until Brian defines what "gradient" means after using the system.
+
+**Next step:** Not urgent for MVP. Revisit in Phase 2.
 
 **Priority:** LOW for MVP, MEDIUM for Phase 2.
 
@@ -173,23 +163,21 @@
 
 ## Vacant Unit Pricing — Remaining Gaps
 
-### Gap 8: Competitor Rate Data Source
+### Gap 8: Competitor Rate Data Source — DECISION MADE
 
-**Status:** Brian references competitor rates in his weekly pricing, classified as A/B/C tiers. We don't know how this data gets into the system.
+**Status:** Decision: **Competitor data will come from either an external data feed (StorTrack) or a custom ManageSpace web scraper built internally.** No manual entry as primary source — we will provide the data to the customer.
 
 **Why it matters:** Without competitor data, the "price to market" mode of the recommendation engine has nothing to work with.
 
-**What we don't know:**
-1. Where does Brian currently get competitor rates? (Manual checks? Scraper? Third-party data?)
-2. How often are comp rates updated?
-3. Who maintains the competitor list and tier assignments?
-4. Is there an existing competitor database we can import from?
+**Approach:**
+1. MVP: Build the competitor table UI and recommendation engine assuming data is populated
+2. Data source: Integrate StorTrack feed (if available/affordable) OR build a custom scraper that pulls competitor rates from public listing sites
+3. A/B/C tier assignment remains manual (Brian's team classifies competitors by quality + style + distance)
+4. Rate data refreshed automatically; tier classification is a one-time setup per competitor
 
-**Assumption without answer:** Manual entry for MVP. Brian or his team enters comp rates periodically. We provide the table; they populate it.
+**Next step:** Still ask Brian on Feb 19: "How do you currently get competitor rates?" — useful context even though we'll provide the data pipeline.
 
-**Next step:** Ask Brian on Feb 19: "How do you currently get competitor rates? Is there a spreadsheet or database we can import from?"
-
-**Priority:** MEDIUM — MVP works without it (activity-based pricing still functions), but comp data makes the tool significantly more useful.
+**Priority:** MEDIUM for MVP (activity-based pricing works without it), HIGH for full vacant pricing value.
 
 ---
 
@@ -225,42 +213,39 @@ Make these configurable. Let Brian adjust after he sees recommendations.
 
 ---
 
-### Gap 10: Activity Data Granularity from SiteLink
+### Gap 10: Activity Data Granularity from SiteLink — ROUTING DECIDED
 
-**Status:** Brian uses 7/14/30 day move-in and move-out counts per unit group. We need this data from SiteLink.
+**Status:** Decision: **This data will flow through ManageSpace's platform (SiteLink → ManageSpace → ECRI/Pricing modules).** Paul needs to ensure the SiteLink sync captures tenant-level move-in and move-out dates so we can aggregate to unit group level for 7/14/30 day activity windows.
 
 **Why it matters:** The entire vacant pricing workflow is built on activity signals. Without move-in/move-out data at the unit group level with dates, we can't calculate the activity metrics.
 
-**What we don't know:**
-1. Does SiteLink export move-in and move-out dates per tenant?
-2. Can we derive unit-group-level activity from tenant-level data?
-3. What's the data freshness? (Real-time? Daily? Weekly?)
-4. Is this available via API or only file export?
+**Data requirements for Paul:**
+1. Tenant-level move-in date (per tenant record)
+2. Tenant-level move-out date (per tenant record)
+3. Unit group assignment per unit (size + CC + floor + access)
+4. Data freshness: daily minimum (real-time preferred)
+5. Historical move-in/move-out records for at least 30 days back (90 preferred)
 
-**Assumption without answer:** SiteLink has tenant-level move-in/move-out dates. We aggregate to unit group level. Data is at least daily.
+**Next step:** Include in consolidated data requirements doc for Paul. Must be in place before vacant pricing module can go live.
 
-**Next step:** Confirm with Paul/Adam: what tenant activity data is available from SiteLink and how fresh is it?
-
-**Priority:** HIGH — blocks vacant pricing MVP.
+**Priority:** HIGH — blocks vacant pricing MVP. Include in Paul's requirements doc.
 
 ---
 
-### Gap 11: 3-Year Historical Occupancy Data
+### Gap 11: 3-Year Historical Occupancy Data — ROUTING DECIDED
 
-**Status:** Brian uses a 3-year monthly occupancy chart as the starting point for his pricing workflow.
+**Status:** Decision: **Paul must ensure SiteLink sync captures historical occupancy data.** This needs to be in the consolidated data requirements doc we deliver to Paul. Either SiteLink stores it directly (monthly snapshots per unit group) or Paul derives it from historical tenant move-in/move-out records during the initial data import.
 
 **Why it matters:** The "store health overview" chart is the first thing Brian looks at. Without historical occupancy, this screen is empty.
 
-**What we don't know:**
-1. Does SiteLink store historical occupancy by month per unit group?
-2. If not, can we derive it from tenant move-in/move-out dates?
-3. Do we have 3 years of data, or does it start from when Morningstar joined SiteLink?
+**Data requirements for Paul:**
+1. Monthly occupancy per unit group — 36 months back (3 years)
+2. If SiteLink doesn't store monthly snapshots, derive from tenant move-in/move-out history
+3. Also need: historical street rates and achieved rates per unit group per month (for the 3-line chart Brian uses)
 
-**Assumption without answer:** We can derive monthly occupancy from tenant activity data if SiteLink doesn't store it directly. May need to build during initial data import.
+**Next step:** Include in consolidated data requirements doc for Paul.
 
-**Next step:** Check with Paul: is historical occupancy available per unit group, or do we need to reconstruct it?
-
-**Priority:** MEDIUM — nice for MVP, but the activity-based workflow (7/14/30 day) can function without the 3-year chart.
+**Priority:** MEDIUM for MVP (activity-based workflow works without it), but the 3-year chart is high-value for Brian's workflow. Include in Paul's doc.
 
 ---
 
@@ -350,30 +335,31 @@ Time: 1:15 PM ET
 
 | Min | Topic | Goal |
 |-----|-------|------|
-| 0–5 | Show Excel validation | "We ran 5 rows from the Cornelius file through our engine. Here's where we match and where we differ." |
-| 5–10 | Fund-level tier adjustments | "Do you want each tier independently adjustable by fund, or auto-proportional? Which funds need different settings now?" |
-| 10–15 | SiteLink upload format | "What does the file look like that you upload back to SiteLink after running ECRIs?" |
-| 15–20 | Competitor data source | "How do you currently get competitor rates? Can we import your existing comp data?" |
-| 20–25 | Pricing increment calibration | "What's a typical weekly price change by unit size? What's the max?" |
-| 25–30 | User roles | "How many DMs? Should each only see their stores? Any store managers need access?" |
-| 30+ | Quick hits | Definitions doc status, historical data import format, any other gaps |
+| 0–8 | Show Excel validation results | "We ran all 50 Cornelius tenants through our engine. **100% match on formula rows.** We also analyzed your 21 overrides — seasonal low-rate tenants getting 45–60%, low-occ dial-downs to 10–12%. Is Cornelius typical or an outlier for override rate?" |
+| 8–12 | Tier 1 as attention flag | "Every Tier 1 tenant at Cornelius was overridden. Should we treat Tier 1 differently in the UI — more like a 'needs review' flag than a recommendation?" |
+| 12–17 | Fund-level tier adjustments | "Do you want each tier independently adjustable by fund, or auto-proportional? Which funds need different settings now?" |
+| 17–22 | SiteLink upload format | "What does the file look like that you upload back to SiteLink after running ECRIs?" |
+| 22–27 | Competitor data source | "How do you currently get competitor rates? Can we import your existing comp data?" |
+| 27–30 | Pricing increment calibration | "What's a typical weekly price change by unit size? What's the max?" |
+| 30–35 | User roles | "How many DMs? Should each only see their stores? Any store managers need access?" |
+| 35+ | Quick hits | Definitions doc status, historical data import format, unit group naming (we see 'Drive To Your Door', 'Heated & Cooled', 'Standard' — is this the standard pattern?) |
 
 ---
 
 ## Summary: What to Assume and Build
 
-| Gap | Safe Assumption | Build Risk |
-|-----|----------------|------------|
-| Formula validation | Our pseudocode matches Brian's verbal description | LOW — validate against Excel before Feb 19 |
-| Fund-level tiers | Independent overrides per fund, no auto-proportional | LOW — easy to add later |
-| 75% occupancy | Binary threshold | LOW — configurable field, easy to change |
-| Cross-month multi-unit | Flag based on full facility roster scan | LOW — simple query |
-| SiteLink data fields | Standard export has rate change dates, tenant details | MEDIUM — need to verify |
-| CSV export format | Match SiteLink import template | MEDIUM — need the template |
-| Competitor data | Manual entry for V1 | LOW — always works as fallback |
-| Pricing increments | Conservative defaults, make configurable | LOW — Brian adjusts after seeing output |
-| Activity data | Tenant-level move-in/out dates available from SiteLink | MEDIUM — need to verify |
-| Historical occupancy | Can derive from tenant data if not stored directly | LOW — can reconstruct |
-| User roles | Admin + DM + Manager (read-only) | LOW — standard RBAC |
-| Marinas | Out of scope for go-live | NONE |
-| Qlik replacement | Not MVP scope | NONE |
+| Gap | Safe Assumption | Build Risk | Status |
+|-----|----------------|------------|--------|
+| Formula validation | ~~Our pseudocode matches Brian's verbal description~~ | ~~LOW~~ | **RESOLVED — 100% match** |
+| Fund-level tiers | Independent overrides per fund, no auto-proportional. ~5 funds, changes annually. | LOW | **DECIDED** (Phase 2) |
+| 75% occupancy | Binary threshold + configurable in settings UI | LOW | **DECIDED** (Phase 2) |
+| Cross-month multi-unit | Flag based on full facility roster scan | LOW — simple query | Open |
+| SiteLink data fields | Standard export has rate change dates, tenant details | MEDIUM — need to verify | Open |
+| CSV export format | Match SiteLink import template | MEDIUM — need the template | Open |
+| Competitor data | StorTrack feed or custom ManageSpace scraper — we provide the data | LOW | **DECIDED** |
+| Pricing increments | Conservative defaults, make configurable | LOW — Brian adjusts after seeing output | Open |
+| Activity data | Flows through ManageSpace platform (SiteLink → MS → modules) | LOW — include in Paul's requirements | **DECIDED — for Paul's doc** |
+| Historical occupancy | Paul to extract from SiteLink — include in requirements doc | LOW — include in Paul's requirements | **DECIDED — for Paul's doc** |
+| User roles | Admin + DM + Manager (read-only) | LOW — standard RBAC | Open |
+| Marinas | Out of scope for go-live | NONE | Deferred |
+| Qlik replacement | Not MVP scope | NONE | Deferred |

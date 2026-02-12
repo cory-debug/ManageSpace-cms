@@ -74,11 +74,18 @@ Brian wants the ability to adjust tier percentages by fund, with store-level ove
 
 > Brian [46:45]: *"This fund instead of the baseline being 20, it should be 25... or let's say a fund is struggling, let's do 17 as the baseline instead of 20."*
 
-**Desired behavior:**
+**Decision (confirmed by Cory):** Build **independent tier percentage overrides per fund** — no auto-proportional adjustment. Each tier (40/10/15/20) is independently editable per fund.
+
+**Key context:**
+- Morningstar has ~5 funds
+- Fund-level settings would change infrequently — annually at most
+- Independent overrides are simpler to build and explain
+- If Brian later wants proportional scaling, add a "lock ratio" toggle
+
+**Implementation (Phase 2):**
 1. Set tier percentages at fund level (e.g., Fund A: 40/10/15/25 instead of 40/10/15/20)
 2. Override individual stores within the fund (e.g., two stores at 20% even when fund is at 17%)
-3. When baseline changes, other tiers can optionally shift proportionally (Brian: "probably, yeah")
-4. Alternatively, allow manual adjustment of each tier independently
+3. No auto-proportional adjustment — each tier is independent
 
 > Brian [48:03]: *"These two stores don't put them to 17, either keep them at 20 or actually even move them up. That would be a really good function."*
 
@@ -271,12 +278,14 @@ Following ManageSpace UI/UX principles: two-panel layout, management UI (Tier 2 
 ### Screen 3: ECRI Settings
 
 **Section 1: Formula Configuration**
-- Tier percentages (40/10/15/20) — editable per fund, per store
-- Tier thresholds: Tier 1 median (-20%), Tier 1 occupancy (75%), Tier 2 median (+75%), Tier 3 street (+15%), Tier 3 median (+15%)
+- Tier percentages (40/10/15/20) — editable globally, per fund (Phase 2), per store (Phase 2)
+- Tier thresholds: Tier 1 median (-20%), Tier 1 occupancy (75% — configurable), Tier 2 median (+75%), Tier 3 street (+15%), Tier 3 median (+15%)
 - Trial percentage (20%)
+- Occupancy threshold: 75% binary for MVP, configurable per facility/unit group size range for Phase 2
 
-**Section 2: Fund-Level Overrides**
-- Fund list with tier configurations
+**Section 2: Fund-Level Overrides (Phase 2)**
+- ~5 funds at Morningstar, settings change annually at most
+- Independent tier percentage overrides per fund (no auto-proportional)
 - Store-level override toggles within each fund
 - Visual diff when store deviates from fund
 
@@ -460,18 +469,21 @@ The existing RevMan engine (`app/lib/recommendation-engine.ts`) uses a **fundame
 
 ## 6. Validation Plan
 
-### Excel Parity Check
+### Excel Parity Check — COMPLETE
 
-Brian confirmed formula in **Column Z**, starting row 10+. Columns A–Y are hard-coded lookups; Z onward are live formulas.
+**Result: 29/29 formula rows = 100% match. Zero mismatches.**
 
-> Brian [42:58]: *"Column Z, everything before Z is hard coded... Z onward to like AI, those are actual formulas. So if you change the percent input, the output will show up on the right side."*
+Full report: `docs/ecri-formula-validation.md`
 
-**Steps:**
-1. Extract 5–10 rows from Cornelius Excel where Column Z formula is intact
-2. Input same data (current rent, median, street, occupancy) into our engine
-3. Confirm tier assignment matches
-4. Confirm % and new rent match
-5. Document any discrepancies → resolve with Brian on Feb 19 call
+**What was validated:**
+- Extracted all 50 Cornelius tenants from `Mstar ECRI Template - Calc Tool.xlsx`
+- Column Z formula decoded and matched to our 4-tier engine
+- Tier thresholds confirmed from Excel reference cells (AQ2=-0.20, AR3=0.75, AP2=0.75, AP3=0.10, AQ3=0.40, AP4=0.15)
+- 29 formula rows: 100% match on tier assignment
+- 21 override rows analyzed: seasonal low-rate (45–60%), low-occ dial-down (10–12%), above-street moderation (12–18%)
+- Key finding: Tier 1 (40%) was overridden in every single case — it's an attention flag, not a final recommendation
+
+> Brian [42:58]: *"Column Z, everything before Z is hard coded... Z onward to like AI, those are actual formulas."*
 
 ### DM Acceptance Test
 
