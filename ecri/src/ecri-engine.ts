@@ -44,6 +44,8 @@ export interface ECRITenant {
   status: 'pending' | 'approved' | 'modified' | 'skipped';
   approvedAmount?: number;
   overrideReason?: string;
+  skipReason?: string;
+  dmNotes?: string;
   previousIncreases: { date: string; amount: number }[];
   competitors: Competitor[];
 }
