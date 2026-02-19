@@ -1080,19 +1080,20 @@ export default function ECRIDashboard() {
                     <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
                       April 2026 batch · Effective Apr 1 · {currentStats.ecriCount} ECRIs · <span style={{ color: C.positive, fontWeight: 600 }}>+${currentStats.potentialRevenue}/mo</span>
                     </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12 }}>
-                      {currentStats.tier1Count > 0 && (
-                        <span><span style={{ color: C.negative }}>●</span> {currentStats.tier1Count} Tier 1 (40%)</span>
-                      )}
-                      {currentStats.tier2Count > 0 && (
-                        <span><span style={{ color: C.positive }}>●</span> {currentStats.tier2Count} Tier 2 (10%)</span>
-                      )}
-                      {currentStats.tier3Count > 0 && (
-                        <span><span style={{ color: C.warning }}>●</span> {currentStats.tier3Count} Tier 3 (15%)</span>
-                      )}
-                      {currentStats.tier4Count > 0 && (
-                        <span><span style={{ color: C.info }}>●</span> {currentStats.tier4Count} Tier 4 (20%)</span>
-                      )}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      {([
+                        { count: currentStats.tier1Count, label: 'Tier 1', pct: '40%', bg: '#FEF2F2', color: C.negative },
+                        { count: currentStats.tier2Count, label: 'Tier 2', pct: '10%', bg: '#ECFDF5', color: C.positive },
+                        { count: currentStats.tier3Count, label: 'Tier 3', pct: '15%', bg: '#FFFBEB', color: C.warning },
+                        { count: currentStats.tier4Count, label: 'Tier 4', pct: '20%', bg: '#EFF6FF', color: C.info },
+                      ] as const).filter(t => t.count > 0).map(t => (
+                        <div key={t.label} style={{
+                          padding: '3px 10px', borderRadius: 6, fontSize: 11, background: t.bg,
+                        }}>
+                          <span style={{ color: C.textMuted }}>{t.count} </span>
+                          <span style={{ fontWeight: 600, color: t.color }}>{t.label} ({t.pct})</span>
+                        </div>
+                      ))}
                     </div>
                     {/* Batch progress bar */}
                     {currentStats.ecriCount > 0 && (
@@ -1248,11 +1249,32 @@ export default function ECRIDashboard() {
                               {group.unitGroup}
                             </span>
                           </div>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 12, color: C.textSecondary, marginTop: 4, paddingLeft: 20 }}>
-                            <span>Occ: <span style={{ color: occColor, fontWeight: 600 }}>{group.occupancyOccupied}/{group.occupancyTotal} ({occPct}%)</span></span>
-                            <span>Median: <span style={{ fontWeight: 600 }}>${group.median}</span></span>
-                            <span>Street: <span style={{ fontWeight: 600 }}>${group.streetRate}</span></span>
-                            {tierParts.length > 0 && <span>{tierParts.join(', ')}</span>}
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6, paddingLeft: 20, flexWrap: 'wrap' }}>
+                            <div style={{
+                              padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                              background: occPct > 85 ? '#ECFDF5' : occPct >= 75 ? '#FFFBEB' : '#FEF2F2',
+                            }}>
+                              <span style={{ color: C.textMuted }}>Occupancy </span>
+                              <span style={{ fontWeight: 600, color: occColor }}>{group.occupancyOccupied}/{group.occupancyTotal} ({occPct}%)</span>
+                            </div>
+                            <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: C.bg }}>
+                              <span style={{ color: C.textMuted }}>Median </span>
+                              <span style={{ fontWeight: 600, color: C.textPrimary }}>${group.median}</span>
+                            </div>
+                            <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: C.bg }}>
+                              <span style={{ color: C.textMuted }}>Street </span>
+                              <span style={{ fontWeight: 600, color: C.textPrimary }}>${group.streetRate}</span>
+                            </div>
+                            {tierParts.length > 0 && tierParts.map((tp, i) => (
+                              <div key={i} style={{
+                                padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                background: tp.includes('40%') ? '#FEF2F2' : tp.includes('10%') ? '#ECFDF5' : tp.includes('15%') ? '#FFFBEB' : '#EFF6FF',
+                                color: tp.includes('40%') ? C.negative : tp.includes('10%') ? C.positive : tp.includes('15%') ? C.warning : C.info,
+                                fontWeight: 600,
+                              }}>
+                                {tp}
+                              </div>
+                            ))}
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -1391,18 +1413,30 @@ export default function ECRIDashboard() {
                             </div>
 
                             {/* Row 3: Key metrics */}
-                            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: C.textSecondary, marginTop: 6, paddingLeft: 8 }}>
-                              <span>TvS: <span style={{
-                                color: tenant.tenantVsStreet > 0 ? C.negative : C.positive, fontWeight: 600,
-                              }}>{tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}%</span></span>
-                              <span>%Delta: <span style={{ fontWeight: 600 }}>
-                                {tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}%
-                              </span></span>
-                              <span>Occ: <span style={{
-                                fontWeight: 600,
-                                color: tenant.unitGroupOccupancy > 0.85 ? C.positive
-                                  : tenant.unitGroupOccupancy >= 0.75 ? C.warning : C.negative,
-                              }}>{(tenant.unitGroupOccupancy * 100).toFixed(0)}%</span></span>
+                            <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingLeft: 8, flexWrap: 'wrap' }}>
+                              <div style={{
+                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                background: tenant.tenantVsStreet > 0 ? '#FEF2F2' : '#ECFDF5',
+                                color: tenant.tenantVsStreet > 0 ? C.negative : C.positive,
+                              }}>
+                                <span style={{ color: C.textMuted }}>vs Street </span>
+                                <span style={{ fontWeight: 600 }}>{tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}%</span>
+                              </div>
+                              <div style={{
+                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                background: C.bg,
+                              }}>
+                                <span style={{ color: C.textMuted }}>Trial vs Median </span>
+                                <span style={{ fontWeight: 600, color: C.textPrimary }}>{tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}%</span>
+                              </div>
+                              <div style={{
+                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                background: tenant.unitGroupOccupancy > 0.85 ? '#ECFDF5' : tenant.unitGroupOccupancy >= 0.75 ? '#FFFBEB' : '#FEF2F2',
+                                color: tenant.unitGroupOccupancy > 0.85 ? C.positive : tenant.unitGroupOccupancy >= 0.75 ? C.warning : C.negative,
+                              }}>
+                                <span style={{ color: C.textMuted }}>Occupancy </span>
+                                <span style={{ fontWeight: 600 }}>{(tenant.unitGroupOccupancy * 100).toFixed(0)}%</span>
+                              </div>
                             </div>
 
                             {/* Row 4: Flag badges */}
@@ -1582,25 +1616,65 @@ export default function ECRIDashboard() {
                                   marginBottom: 16, padding: 14, borderRadius: 8,
                                   background: '#F5F3FF', border: '1px solid #E0E7FF',
                                 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600, color: C.aiAccent, marginBottom: 8 }}>
-                                    Tier Rationale
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: C.aiAccent }}>Tier Rationale</span>
+                                    <span style={{
+                                      padding: '2px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                      background: tenant.assignedTier === 1 ? '#FEF2F2' : tenant.assignedTier === 2 ? '#ECFDF5' : tenant.assignedTier === 3 ? '#FFFBEB' : '#EFF6FF',
+                                      color: tenant.assignedTier === 1 ? C.negative : tenant.assignedTier === 2 ? C.positive : tenant.assignedTier === 3 ? C.warning : C.info,
+                                    }}>{tierLabel(tenant.assignedTier)}</span>
                                   </div>
-                                  <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.7 }}>
-                                    <strong>{tierLabel(tenant.assignedTier)}</strong>: After 20% trial (${tenant.trialRate.toFixed(0)}),
-                                    tenant is {tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}% vs
-                                    median (${tenant.unitGroupMedian}). TvS is {tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}% vs
-                                    street (${tenant.streetRate}).
+
+                                  {/* Key metric chips */}
+                                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                                    <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.7)' }}>
+                                      <span style={{ color: C.textMuted }}>20% Trial </span>
+                                      <span style={{ fontWeight: 600, color: C.textPrimary }}>${tenant.trialRate.toFixed(0)}</span>
+                                    </div>
+                                    <div style={{
+                                      padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                      background: Math.abs(tenant.newRateDeltaToMedian) > 0.20 ? (tenant.newRateDeltaToMedian < 0 ? '#FEF2F2' : '#ECFDF5') : 'rgba(255,255,255,0.7)',
+                                    }}>
+                                      <span style={{ color: C.textMuted }}>Trial vs Median </span>
+                                      <span style={{
+                                        fontWeight: 600,
+                                        color: tenant.newRateDeltaToMedian < -0.20 ? C.negative : tenant.newRateDeltaToMedian > 0.75 ? C.positive : C.textPrimary,
+                                      }}>{tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}%</span>
+                                      <span style={{ color: C.textMuted }}> (${tenant.unitGroupMedian})</span>
+                                    </div>
+                                    <div style={{
+                                      padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                      background: tenant.tenantVsStreet > 0.15 ? '#FEF2F2' : 'rgba(255,255,255,0.7)',
+                                    }}>
+                                      <span style={{ color: C.textMuted }}>vs Street </span>
+                                      <span style={{
+                                        fontWeight: 600,
+                                        color: tenant.tenantVsStreet > 0.15 ? C.negative : C.textPrimary,
+                                      }}>{tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}%</span>
+                                      <span style={{ color: C.textMuted }}> (${tenant.streetRate})</span>
+                                    </div>
+                                    <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: 'rgba(255,255,255,0.7)' }}>
+                                      <span style={{ color: C.textMuted }}>Occupancy </span>
+                                      <span style={{
+                                        fontWeight: 600,
+                                        color: tenant.unitGroupOccupancy > 0.85 ? C.positive : tenant.unitGroupOccupancy >= 0.75 ? C.warning : C.negative,
+                                      }}>{(tenant.unitGroupOccupancy * 100).toFixed(0)}%</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Clean rationale sentence */}
+                                  <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>
                                     {tenant.assignedTier === 1 && (
-                                      <> Below -20% threshold AND occupancy {(tenant.unitGroupOccupancy * 100).toFixed(0)}% &gt; 75%. Aggressive catch-up recommended.</>
+                                      <>Trial rate is well below median (&lt; -20%) and occupancy exceeds 75% — aggressive catch-up recommended.</>
                                     )}
                                     {tenant.assignedTier === 2 && (
-                                      <> Above +75% median threshold. Premium payer — conservative 10% increase to retain.</>
+                                      <>Trial rate far exceeds median (&gt; +75%) — premium payer, conservative 10% increase to retain.</>
                                     )}
                                     {tenant.assignedTier === 3 && (
-                                      <> Both TvS ({(tenant.tenantVsStreet * 100).toFixed(1)}%) and %Delta ({(tenant.newRateDeltaToMedian * 100).toFixed(1)}%) exceed +15% threshold. Moderate 15% increase.</>
+                                      <>Both tenant vs street and trial vs median exceed the +15% threshold — moderate 15% increase.</>
                                     )}
                                     {tenant.assignedTier === 4 && (
-                                      <> Does not meet Tier 1 (&lt;-20% + &gt;75% occ), Tier 2 (&gt;+75%), or Tier 3 (&gt;+15% TvS AND &gt;+15% median). Standard 20% baseline.</>
+                                      <>Does not trigger Tier 1, 2, or 3 thresholds — standard 20% baseline increase.</>
                                     )}
                                   </div>
                                 </div>

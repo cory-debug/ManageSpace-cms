@@ -1768,29 +1768,36 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
                       />
                     </th>
                     {([
-                      { label: '', key: '', align: 'left' },
-                      { label: 'Unit Group', key: '', align: 'left' },
-                      { label: 'Total', key: 'total', align: 'right' },
-                      { label: 'Vacant', key: 'vacant', align: 'right' },
-                      { label: 'Occ%', key: 'occ', align: 'right' },
-                      { label: '7d', key: '7d', align: 'right' },
-                      { label: '14d', key: '14d', align: 'right' },
-                      { label: '30d', key: '30d', align: 'right' },
-                      { label: 'Street', key: 'street', align: 'right' },
-                      { label: 'Gap', key: 'gap', align: 'right' },
-                      { label: 'Reco', key: 'reco', align: 'right' },
-                      { label: 'Final', key: 'final', align: 'right' },
-                      { label: 'Action', key: '', align: 'center' },
+                      { label: '', key: '', align: 'left', group: '' },
+                      { label: 'Unit Group', key: '', align: 'left', group: '' },
+                      { label: 'Total', key: 'total', align: 'right', group: '' },
+                      { label: 'Vacant', key: 'vacant', align: 'right', group: '' },
+                      { label: 'Occupancy', key: 'occ', align: 'right', group: '' },
+                      { label: '7 Day', key: '7d', align: 'right', group: 'net' },
+                      { label: '14 Day', key: '14d', align: 'right', group: 'net' },
+                      { label: '30 Day', key: '30d', align: 'right', group: 'net' },
+                      { label: 'Street', key: 'street', align: 'right', group: 'pricing' },
+                      { label: 'St vs Ach', key: 'gap', align: 'right', group: 'pricing' },
+                      { label: 'Suggested', key: 'reco', align: 'right', group: 'pricing' },
+                      { label: 'Final', key: 'final', align: 'right', group: 'pricing' },
+                      { label: 'Action', key: '', align: 'center', group: '' },
                     ] as const).map((h, i) => (
                       <th
                         key={i}
                         onClick={h.key ? () => handleSort(h.key) : undefined}
                         style={{
-                          padding: '8px 4px', fontWeight: 600, color: sortCol === h.key ? C.textPrimary : C.textMuted,
+                          padding: '8px 10px', fontWeight: 600, color: sortCol === h.key ? C.textPrimary : C.textMuted,
                           fontSize: 11, textAlign: h.align as 'left' | 'right' | 'center', whiteSpace: 'nowrap',
                           cursor: h.key ? 'pointer' : 'default', userSelect: 'none', background: C.card,
+                          borderLeft: (h.key === '7d' || h.key === 'street') ? `2px solid ${C.border}` : 'none',
                         }}
                       >
+                        {h.group === 'net' && h.key === '7d' && (
+                          <div style={{ fontSize: 9, color: C.textMuted, fontWeight: 500, marginBottom: 2, letterSpacing: 0.5 }}>NET RENTALS</div>
+                        )}
+                        {h.group === 'pricing' && h.key === 'street' && (
+                          <div style={{ fontSize: 9, color: C.textMuted, fontWeight: 500, marginBottom: 2, letterSpacing: 0.5 }}>PRICING</div>
+                        )}
                         {h.label}
                         {sortCol === h.key && (
                           <span style={{ marginLeft: 2, fontSize: 9 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>
@@ -1825,57 +1832,91 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
                           <td style={{ padding: '8px 6px', width: 20 }}>
                             <span style={{ fontSize: 10, color: C.textMuted }}>{isExpanded ? '▼' : '▶'}</span>
                           </td>
-                          <td style={{ padding: '8px 6px', fontWeight: 500 }}>
-                            {isApplied && <span style={{ color: C.positive, marginRight: 4 }}>✓</span>}
-                            {g.name}
-                            {g.hasAlert && !isApplied && <span style={{ marginLeft: 6, color: C.warning }}>⚑</span>}
-                            {hasViolation && <span style={{ marginLeft: 4, color: C.negative, fontSize: 10 }}>⚠</span>}
-                            {groupNotes[g.id] && <span title={groupNotes[g.id]} style={{ marginLeft: 4, fontSize: 10, color: C.aiAccent }}>✎</span>}
-                            <RateSparkline history={g.priceHistory} finalRate={g.finalRate} />
+                          <td style={{ padding: '8px 6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontWeight: 500 }}>
+                                {isApplied && <span style={{ color: C.positive, marginRight: 4 }}>✓</span>}
+                                {g.name}
+                              </span>
+                              <RateSparkline history={g.priceHistory} finalRate={g.finalRate} />
+                              {g.hasAlert && !isApplied && (
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                  background: '#FFFBEB', color: C.warning,
+                                }}>Attention</span>
+                              )}
+                              {hasViolation && (
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                  background: '#FEF2F2', color: C.negative,
+                                }}>Hierarchy</span>
+                              )}
+                              {groupNotes[g.id] && (
+                                <span title={groupNotes[g.id]} style={{
+                                  padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                  background: '#F5F3FF', color: C.aiAccent,
+                                }}>Note</span>
+                              )}
+                            </div>
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right' }}>{g.totalUnits}</td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', color: g.vacantUnits > 5 ? C.negative : C.textSecondary }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'right' }}>{g.totalUnits}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', color: g.vacantUnits > 5 ? C.negative : C.textSecondary }}>
                             {g.vacantUnits}
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600, color: occColor(g.occupancyPct) }}>
-                            {g.occupancyPct}%
+                          <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                              color: occColor(g.occupancyPct),
+                              background: g.occupancyPct > 90 ? '#ECFDF5' : g.occupancyPct >= 75 ? '#FFFBEB' : '#FEF2F2',
+                            }}>{g.occupancyPct}%</span>
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', color: netColor(g.activity.day7.net), fontWeight: 500 }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', borderLeft: `2px solid ${C.border}`, color: netColor(g.activity.day7.net), fontWeight: 500 }}>
                             {g.activity.day7.net > 0 ? '+' : ''}{g.activity.day7.net}
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', color: netColor(g.activity.day14.net), fontWeight: 500 }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', color: netColor(g.activity.day14.net), fontWeight: 500 }}>
                             {g.activity.day14.net > 0 ? '+' : ''}{g.activity.day14.net}
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', color: netColor(g.activity.day30.net), fontWeight: 500 }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', color: netColor(g.activity.day30.net), fontWeight: 500 }}>
                             {g.activity.day30.net > 0 ? '+' : ''}{g.activity.day30.net}
                           </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: 600 }}>${g.streetRate}</td>
-                          <td style={{
-                            padding: '8px 4px', textAlign: 'right', fontSize: 11, fontWeight: 600,
-                            color: g.streetVsAchievedGap < -0.10 ? C.negative : g.streetVsAchievedGap > 0.05 ? C.warning : C.textMuted,
-                          }}>
-                            {g.streetVsAchievedGap >= 0 ? '+' : ''}{(g.streetVsAchievedGap * 100).toFixed(0)}%
-                          </td>
-                          <td style={{ padding: '8px 4px', textAlign: 'right' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', borderLeft: `2px solid ${C.border}`, fontWeight: 600 }}>${g.streetRate}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right' }}>
                             <span style={{
-                              color: g.recommendation.direction === 'INCREASE' ? C.positive
-                                : g.recommendation.direction === 'DECREASE' ? C.negative : C.textMuted,
-                              fontWeight: 600,
+                              padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                              color: g.streetVsAchievedGap < -0.10 ? C.negative : g.streetVsAchievedGap > 0.05 ? C.warning : C.textMuted,
+                              background: g.streetVsAchievedGap < -0.10 ? '#FEF2F2' : g.streetVsAchievedGap > 0.05 ? '#FFFBEB' : C.bg,
                             }}>
-                              ${g.recommendation.newRate} {g.recommendation.direction === 'INCREASE' ? '↑' : g.recommendation.direction === 'DECREASE' ? '↓' : '→'}
+                              {g.streetVsAchievedGap >= 0 ? '+' : ''}{(g.streetVsAchievedGap * 100).toFixed(0)}%
                             </span>
                           </td>
-                          <td style={{
-                            padding: '8px 4px', textAlign: 'right', fontWeight: 700,
-                            color: g.overrideRate !== null ? C.warning : C.textPrimary,
-                          }}>
-                            ${g.finalRate}
-                            {g.overrideRate !== null && <span style={{ fontSize: 9, marginLeft: 2 }}>✎</span>}
+                          <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                              color: g.recommendation.direction === 'INCREASE' ? C.positive
+                                : g.recommendation.direction === 'DECREASE' ? C.negative : C.textMuted,
+                              background: g.recommendation.direction === 'INCREASE' ? '#ECFDF5'
+                                : g.recommendation.direction === 'DECREASE' ? '#FEF2F2' : C.bg,
+                            }}>
+                              {g.recommendation.direction === 'INCREASE' ? '↑' : g.recommendation.direction === 'DECREASE' ? '↓' : '→'} ${g.recommendation.newRate}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right' }}>
+                            <span style={{
+                              padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 12,
+                              color: g.overrideRate !== null ? C.warning : C.textPrimary,
+                              background: g.overrideRate !== null ? '#FFFBEB' : 'transparent',
+                            }}>
+                              ${g.finalRate}
+                              {g.overrideRate !== null && <span style={{ fontSize: 9, marginLeft: 2 }}>✎</span>}
+                            </span>
                             {g.compWeightedAvg > 0 && g.finalRate > g.compWeightedAvg && (
-                              <span title={`Above comp avg ($${g.compWeightedAvg})`} style={{ fontSize: 9, color: C.negative, marginLeft: 2 }}>▲</span>
+                              <span title={`Above comp avg ($${g.compWeightedAvg})`} style={{
+                                marginLeft: 3, padding: '1px 5px', borderRadius: 4, fontSize: 9, fontWeight: 600,
+                                background: '#FEF2F2', color: C.negative,
+                              }}>Above Comp</span>
                             )}
                           </td>
-                          <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                             {isApplied ? (
                               <button
                                 onClick={e => { e.stopPropagation(); handleUnapplyGroup(g.id); }}
