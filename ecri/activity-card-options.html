@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Activity Card Design Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F1F5F9; padding: 32px; color: #0F172A;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  h2 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #64748B; }
+  .section { margin-bottom: 40px; }
+  .cards { display: flex; gap: 12px; }
+  .label { font-size: 12px; color: #94A3B8; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Activity Card Design Options</h1>
+<p class="label">Same data across all 3 options — pick the one that reads fastest</p>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION D1: Opposed Daily Bars               -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option D1 — Opposed Daily Bars</h2>
+  <p class="label">Bars up = move-ins, bars down = move-outs. Each column = 1 day. Shows clustering vs spread.</p>
+  <div class="cards" id="optionD1"></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION D2: Dot Strip Heatmap                -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option D2 — Dot Strip Heatmap</h2>
+  <p class="label">Two rows (IN / OUT), one cell per day, color intensity = activity count. Pattern-readable at a glance.</p>
+  <div class="cards" id="optionD2"></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION D3: Cumulative Area Ribbon           -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option D3 — Cumulative Area Ribbon</h2>
+  <p class="label">Two area fills building over time. The gap between curves = net. Shows pace and momentum.</p>
+  <div class="cards" id="optionD3"></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION A: Net-First Hero + Stacked Bar      -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option A — Net-First Hero + Stacked Bar</h2>
+  <div class="cards" id="optionA"></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION B: Opposed Flow Layout               -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option B — Opposed Flow</h2>
+  <div class="cards" id="optionB"></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- OPTION C: Mini Vertical Bar Chart           -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Option C — Mini Bar Chart</h2>
+  <div class="cards" id="optionC"></div>
+</div>
+
+<script>
+const C = {
+  bg: '#F1F5F9', card: '#FFFFFF', border: '#E2E8F0',
+  textPrimary: '#0F172A', textSecondary: '#64748B', textMuted: '#94A3B8',
+  positive: '#10B981', warning: '#F59E0B', negative: '#EF4444', info: '#3B82F6',
+};
+
+const DATA = [
+  { label: 'Last 7 Days', ins: 13, outs: 10 },
+  { label: 'Last 14 Days', ins: 24, outs: 22 },
+  { label: 'Last 30 Days', ins: 50, outs: 45 },
+];
+
+const netColor = n => n > 0 ? C.positive : n < 0 ? C.negative : C.textMuted;
+const netArrow = n => n > 0 ? '↑' : n < 0 ? '↓' : '→';
+
+// ═══════════════════════════════════════════
+// OPTION A: Net-First Hero + Stacked Bar
+// ═══════════════════════════════════════════
+document.getElementById('optionA').innerHTML = DATA.map(d => {
+  const net = d.ins - d.outs;
+  const total = d.ins + d.outs;
+  const inPct = total > 0 ? (d.ins / total) * 100 : 50;
+  const nc = netColor(net);
+  const borderLeft = `3px solid ${nc}`;
+  const bgTint = net > 0 ? '#F0FDF4' : net < 0 ? '#FEF2F2' : C.card;
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${bgTint}; border: 1px solid ${C.border};
+      border-left: ${borderLeft};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px;">
+        ${d.label}
+      </div>
+      <div style="font-size: 28px; font-weight: 800; color: ${nc}; line-height: 1; margin-bottom: 10px;">
+        ${net > 0 ? '+' : ''}${net} <span style="font-size: 16px;">${netArrow(net)}</span>
+      </div>
+      <div style="
+        display: flex; height: 6px; border-radius: 3px; overflow: hidden;
+        margin-bottom: 8px; background: #E2E8F0;
+      ">
+        <div style="width: ${inPct}%; background: ${C.positive}; border-radius: 3px 0 0 3px;"></div>
+        <div style="width: ${100 - inPct}%; background: ${C.textMuted}40; border-radius: 0 3px 3px 0;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: ${C.textSecondary};">
+        <span><span style="color: ${C.positive}; font-weight: 700;">${d.ins}</span> move-ins</span>
+        <span><span style="font-weight: 700; color: ${C.textSecondary};">${d.outs}</span> move-outs</span>
+      </div>
+    </div>
+  `;
+}).join('');
+
+// ═══════════════════════════════════════════
+// OPTION B: Opposed Flow
+// ═══════════════════════════════════════════
+document.getElementById('optionB').innerHTML = DATA.map(d => {
+  const net = d.ins - d.outs;
+  const nc = netColor(net);
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${C.card}; border: 1px solid ${C.border};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
+        ${d.label}
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <!-- Move-ins (left) -->
+        <div style="text-align: center; flex: 1;">
+          <div style="font-size: 10px; font-weight: 600; color: ${C.positive}; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em;">Move-ins</div>
+          <div style="font-size: 22px; font-weight: 800; color: ${C.positive};">${d.ins}</div>
+          <div style="font-size: 14px; color: ${C.positive}; margin-top: 2px;">→</div>
+        </div>
+        <!-- Net (center) -->
+        <div style="
+          text-align: center; padding: 8px 14px; border-radius: 8px;
+          background: ${nc}12; border: 1.5px solid ${nc}30;
+        ">
+          <div style="font-size: 9px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; margin-bottom: 2px;">Net</div>
+          <div style="font-size: 22px; font-weight: 800; color: ${nc}; line-height: 1;">
+            ${net > 0 ? '+' : ''}${net}
+          </div>
+        </div>
+        <!-- Move-outs (right) -->
+        <div style="text-align: center; flex: 1;">
+          <div style="font-size: 10px; font-weight: 600; color: ${C.textSecondary}; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em;">Move-outs</div>
+          <div style="font-size: 22px; font-weight: 800; color: ${C.textSecondary};">${d.outs}</div>
+          <div style="font-size: 14px; color: ${C.textSecondary}; margin-top: 2px;">→</div>
+        </div>
+      </div>
+    </div>
+  `;
+}).join('');
+
+// ═══════════════════════════════════════════
+// OPTION C: Mini Vertical Bar Chart
+// ═══════════════════════════════════════════
+document.getElementById('optionC').innerHTML = DATA.map(d => {
+  const net = d.ins - d.outs;
+  const nc = netColor(net);
+  const maxVal = Math.max(d.ins, d.outs);
+  const inH = maxVal > 0 ? (d.ins / maxVal) * 56 : 0;
+  const outH = maxVal > 0 ? (d.outs / maxVal) * 56 : 0;
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${C.card}; border: 1px solid ${C.border};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
+        ${d.label}
+      </div>
+      <div style="display: flex; align-items: flex-end; gap: 16px;">
+        <!-- Bars -->
+        <div style="display: flex; align-items: flex-end; gap: 6px; height: 56px; flex: 1;">
+          <div style="display: flex; flex-direction: column; align-items: center; flex: 1; gap: 3px;">
+            <span style="font-size: 11px; font-weight: 700; color: ${C.positive};">${d.ins}</span>
+            <div style="
+              width: 100%; height: ${inH}px; border-radius: 4px 4px 2px 2px;
+              background: linear-gradient(180deg, ${C.positive}, ${C.positive}90);
+            "></div>
+            <span style="font-size: 9px; color: ${C.textMuted}; font-weight: 500;">IN</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: center; flex: 1; gap: 3px;">
+            <span style="font-size: 11px; font-weight: 700; color: ${C.textSecondary};">${d.outs}</span>
+            <div style="
+              width: 100%; height: ${outH}px; border-radius: 4px 4px 2px 2px;
+              background: linear-gradient(180deg, ${C.textMuted}, ${C.textMuted}70);
+            "></div>
+            <span style="font-size: 9px; color: ${C.textMuted}; font-weight: 500;">OUT</span>
+          </div>
+        </div>
+        <!-- Net -->
+        <div style="text-align: right; min-width: 48px;">
+          <div style="font-size: 9px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase;">Net</div>
+          <div style="font-size: 24px; font-weight: 800; color: ${nc}; line-height: 1.1;">
+            ${net > 0 ? '+' : ''}${net}
+          </div>
+          <div style="font-size: 12px; color: ${nc};">${netArrow(net)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}).join('');
+
+// ═══════════════════════════════════════════
+// MOCK DAILY DATA (deterministic from seed)
+// ═══════════════════════════════════════════
+function generateDaily(days, totalIns, totalOuts) {
+  const ins = new Array(days).fill(0);
+  const outs = new Array(days).fill(0);
+  // Distribute with some clustering
+  let seed = days * 17 + totalIns * 7;
+  const pseudoRand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = 0; i < totalIns; i++) { ins[Math.floor(pseudoRand() * days)]++; }
+  for (let i = 0; i < totalOuts; i++) { outs[Math.floor(pseudoRand() * days)]++; }
+  return { ins, outs };
+}
+
+const DAILY = {
+  7:  generateDaily(7,  13, 10),
+  14: generateDaily(14, 24, 22),
+  30: generateDaily(30, 50, 45),
+};
+
+const DAILY_DATA = [
+  { label: 'Last 7 Days',  days: 7,  totalIns: 13, totalOuts: 10, daily: DAILY[7] },
+  { label: 'Last 14 Days', days: 14, totalIns: 24, totalOuts: 22, daily: DAILY[14] },
+  { label: 'Last 30 Days', days: 30, totalIns: 50, totalOuts: 45, daily: DAILY[30] },
+];
+
+// ═══════════════════════════════════════════
+// D1: Opposed Daily Bars
+// ═══════════════════════════════════════════
+document.getElementById('optionD1').innerHTML = DAILY_DATA.map(d => {
+  const net = d.totalIns - d.totalOuts;
+  const nc = netColor(net);
+  const bgTint = net > 0 ? '#F0FDF4' : net < 0 ? '#FEF2F2' : C.card;
+  const maxDay = Math.max(...d.daily.ins, ...d.daily.outs, 1);
+  const barH = 18; // max bar height in px
+  const gap = d.days <= 7 ? 3 : d.days <= 14 ? 2 : 1;
+
+  const barsHTML = Array.from({ length: d.days }, (_, i) => {
+    const inH = (d.daily.ins[i] / maxDay) * barH;
+    const outH = (d.daily.outs[i] / maxDay) * barH;
+    return `<div style="display: flex; flex-direction: column; align-items: center; flex: 1; gap: 0;">
+      <div style="width: 100%; height: ${inH}px; background: ${C.positive}; border-radius: 2px 2px 0 0; min-height: ${d.daily.ins[i] > 0 ? 2 : 0}px;"></div>
+      <div style="width: 100%; height: 1px; background: ${C.border};"></div>
+      <div style="width: 100%; height: ${outH}px; background: ${C.textMuted}70; border-radius: 0 0 2px 2px; min-height: ${d.daily.outs[i] > 0 ? 2 : 0}px;"></div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${bgTint}; border: 1px solid ${C.border};
+      border-left: 3px solid ${nc};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+        ${d.label}
+      </div>
+      <div style="font-size: 28px; font-weight: 800; color: ${nc}; line-height: 1; margin-bottom: 10px;">
+        ${net > 0 ? '+' : ''}${net} <span style="font-size: 16px;">${netArrow(net)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: ${C.textSecondary}; margin-bottom: 10px;">
+        <span><span style="color: ${C.positive}; font-weight: 700;">${d.totalIns}</span> move-ins</span>
+        <span><span style="font-weight: 700; color: ${C.textSecondary};">${d.totalOuts}</span> move-outs</span>
+      </div>
+      <div style="display: flex; gap: ${gap}px; align-items: center; height: ${barH * 2 + 1}px;">
+        ${barsHTML}
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${C.textMuted}; margin-top: 3px;">
+        <span>${d.days}d ago</span>
+        <span>today</span>
+      </div>
+    </div>
+  `;
+}).join('');
+
+// ═══════════════════════════════════════════
+// D2: Dot Strip Heatmap
+// ═══════════════════════════════════════════
+document.getElementById('optionD2').innerHTML = DAILY_DATA.map(d => {
+  const net = d.totalIns - d.totalOuts;
+  const nc = netColor(net);
+  const bgTint = net > 0 ? '#F0FDF4' : net < 0 ? '#FEF2F2' : C.card;
+  const maxDay = Math.max(...d.daily.ins, ...d.daily.outs, 1);
+  const cellSize = d.days <= 7 ? 24 : d.days <= 14 ? 14 : 7;
+  const cellGap = d.days <= 7 ? 3 : d.days <= 14 ? 2 : 1;
+
+  const renderRow = (values, color) => values.map(v => {
+    const intensity = v / maxDay;
+    const opacity = v === 0 ? 0.08 : 0.15 + intensity * 0.85;
+    return `<div style="
+      width: ${cellSize}px; height: ${cellSize}px; border-radius: ${cellSize <= 8 ? 1 : 3}px;
+      background: ${color}; opacity: ${opacity.toFixed(2)};
+    " title="${v}"></div>`;
+  }).join('');
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${bgTint}; border: 1px solid ${C.border};
+      border-left: 3px solid ${nc};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+        ${d.label}
+      </div>
+      <div style="font-size: 28px; font-weight: 800; color: ${nc}; line-height: 1; margin-bottom: 10px;">
+        ${net > 0 ? '+' : ''}${net} <span style="font-size: 16px;">${netArrow(net)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: ${C.textSecondary}; margin-bottom: 10px;">
+        <span><span style="color: ${C.positive}; font-weight: 700;">${d.totalIns}</span> move-ins</span>
+        <span><span style="font-weight: 700; color: ${C.textSecondary};">${d.totalOuts}</span> move-outs</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 9px; color: ${C.textMuted}; width: 22px; text-align: right;">IN</span>
+          <div style="display: flex; gap: ${cellGap}px;">${renderRow(d.daily.ins, C.positive)}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 9px; color: ${C.textMuted}; width: 22px; text-align: right;">OUT</span>
+          <div style="display: flex; gap: ${cellGap}px;">${renderRow(d.daily.outs, '#64748B')}</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${C.textMuted}; margin-top: 3px; padding-left: 26px;">
+        <span>${d.days}d ago</span>
+        <span>today</span>
+      </div>
+    </div>
+  `;
+}).join('');
+
+// ═══════════════════════════════════════════
+// D3: Cumulative Area Ribbon
+// ═══════════════════════════════════════════
+document.getElementById('optionD3').innerHTML = DAILY_DATA.map(d => {
+  const net = d.totalIns - d.totalOuts;
+  const nc = netColor(net);
+  const bgTint = net > 0 ? '#F0FDF4' : net < 0 ? '#FEF2F2' : C.card;
+
+  // Build cumulative arrays
+  const cumIns = [], cumOuts = [];
+  let runIns = 0, runOuts = 0;
+  for (let i = 0; i < d.days; i++) {
+    runIns += d.daily.ins[i];
+    runOuts += d.daily.outs[i];
+    cumIns.push(runIns);
+    cumOuts.push(runOuts);
+  }
+
+  const svgW = 200, svgH = 40;
+  const maxCum = Math.max(runIns, runOuts, 1);
+
+  const toPoints = (arr) => arr.map((v, i) => {
+    const x = (i / (d.days - 1)) * svgW;
+    const y = svgH - (v / maxCum) * svgH;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const insLine = toPoints(cumIns);
+  const outsLine = toPoints(cumOuts);
+  const insFill = `0,${svgH} ${insLine} ${svgW},${svgH}`;
+  const outsFill = `0,${svgH} ${outsLine} ${svgW},${svgH}`;
+
+  return `
+    <div style="
+      flex: 1; padding: 16px 18px; border-radius: 10px;
+      background: ${bgTint}; border: 1px solid ${C.border};
+      border-left: 3px solid ${nc};
+    ">
+      <div style="font-size: 11px; font-weight: 600; color: ${C.textMuted}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+        ${d.label}
+      </div>
+      <div style="font-size: 28px; font-weight: 800; color: ${nc}; line-height: 1; margin-bottom: 10px;">
+        ${net > 0 ? '+' : ''}${net} <span style="font-size: 16px;">${netArrow(net)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: ${C.textSecondary}; margin-bottom: 8px;">
+        <span><span style="color: ${C.positive}; font-weight: 700;">${d.totalIns}</span> move-ins</span>
+        <span><span style="font-weight: 700; color: ${C.textSecondary};">${d.totalOuts}</span> move-outs</span>
+      </div>
+      <svg width="100%" viewBox="0 0 ${svgW} ${svgH}" preserveAspectRatio="none" style="display: block; height: 40px;">
+        <polygon points="${insFill}" fill="${C.positive}" opacity="0.2" />
+        <polygon points="${outsFill}" fill="#64748B" opacity="0.15" />
+        <polyline points="${insLine}" fill="none" stroke="${C.positive}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        <polyline points="${outsLine}" fill="none" stroke="#64748B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 2" />
+      </svg>
+      <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${C.textMuted}; margin-top: 3px;">
+        <span>${d.days}d ago</span>
+        <span>today → ${runIns} in / ${runOuts} out</span>
+      </div>
+    </div>
+  `;
+}).join('');
+</script>
+
+</body>
+</html>

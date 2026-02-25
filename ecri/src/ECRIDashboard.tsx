@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Fragment } from 'react';
 import { type ECRITenant, type Competitor, buildTenant, OVERRIDE_REASONS } from './ecri-engine';
 import VacantPricingDashboard from './VacantPricingDashboard';
 
@@ -150,14 +150,14 @@ const MOCK_TENANTS: ECRITenant[] = [
     id: 't8', facilityId: 'f1', customerName: 'Lisa Park', unitNumber: '201',
     unitType: '5×10 NCC', unitGroup: '5×10 Non-Climate', features: 'NCC',
     tenureMonths: 11, currentRent: 49, streetRate: 89, unitGroupMedian: 84,
-    unitGroupOccupancy: 0.89, unitGroupTotal: 36, unitGroupOccupied: 32,
+    unitGroupOccupancy: 0.91, unitGroupTotal: 36, unitGroupOccupied: 33,
     isFirstECRI: true,
   }),
   buildTenant({
     id: 't9', facilityId: 'f1', customerName: 'Tommy Rogers', unitNumber: '205',
     unitType: '5×10 NCC', unitGroup: '5×10 Non-Climate', features: 'NCC',
     tenureMonths: 24, currentRent: 168, streetRate: 89, unitGroupMedian: 84,
-    unitGroupOccupancy: 0.89, unitGroupTotal: 36, unitGroupOccupied: 32,
+    unitGroupOccupancy: 0.91, unitGroupTotal: 36, unitGroupOccupied: 33,
     previousIncreases: [{ date: 'Mar 2025', amount: 10 }], isFirstECRI: false,
   }),
 
@@ -504,6 +504,8 @@ export default function ECRIDashboard() {
   const [tenantSearch, setTenantSearch] = useState('');
   const [ecriSubTab, setEcriSubTab] = useState<'recommendations' | 'non-storage'>('recommendations');
   const [batchFinalized, setBatchFinalized] = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState<'A' | 'B' | 'C' | 'D' | 'E'>('A');
+  const [focusIndex, setFocusIndex] = useState(0); // for Version E
 
   // ── localStorage persistence ──
   const STORAGE_KEY = 'ecri-session';
@@ -859,6 +861,101 @@ export default function ECRIDashboard() {
   const groupPendingCount = (group: { tenants: ECRITenant[] }) =>
     group.tenants.filter(t => t.status === 'pending').length;
 
+  // ── Risk score helper ──
+  const riskScore = (t: ECRITenant) => {
+    const aboveStreet = t.isAboveStreet;
+    const risk = aboveStreet || (t.tierPercent >= 0.40 && t.recommendedIncrease > 40)
+      ? 'High' : t.tierPercent >= 0.20 || t.recommendedIncrease > 25 ? 'Med' : 'Low';
+    const rc = risk === 'High' ? C.negative : risk === 'Med' ? C.warning : C.positive;
+    return { risk, rc };
+  };
+
+  // ── Shared: toggle buttons row ──
+  const renderToggleButtons = (tenant: ECRITenant) => {
+    const amt = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+    return (
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+        {[-10, -5, 5, 10].map(pct => (
+          <button key={pct} onClick={e => { e.stopPropagation(); const cur = parseFloat(modifyAmount) || tenant.recommendedNewRent; setModifyAmount(String(Math.round(cur * (1 + pct / 100)))); }}
+            style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${pct < 0 ? '#FECACA' : '#BBF7D0'}`, background: pct < 0 ? '#FEF2F2' : '#F0FDF4', color: pct < 0 ? C.negative : C.positive }}>
+            {pct > 0 ? '+' : ''}{pct}%
+          </button>
+        ))}
+        <span style={{ width: 1, height: 16, background: C.border }} />
+        {[-10, -5, 5, 10].map(d => (
+          <button key={`d${d}`} onClick={e => { e.stopPropagation(); const cur = parseFloat(modifyAmount) || tenant.recommendedNewRent; setModifyAmount(String(Math.round(cur + d))); }}
+            style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: `1px solid ${d < 0 ? '#FECACA' : '#BBF7D0'}`, background: d < 0 ? '#FEF2F2' : '#F0FDF4', color: d < 0 ? C.negative : C.positive }}>
+            {d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d)}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  // ── Shared: position chips for current modify amount ──
+  const renderPositionChips = (tenant: ECRITenant) => {
+    const amt = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+    const pctOfStreet = (amt / tenant.streetRate * 100);
+    const pctOfMedian = (amt / tenant.unitGroupMedian * 100);
+    return (
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: amt > tenant.streetRate ? '#FEF2F2' : '#ECFDF5' }}>
+          <span style={{ color: C.textMuted }}>vs Street </span>
+          <span style={{ fontWeight: 600, color: amt > tenant.streetRate ? C.negative : C.positive }}>{pctOfStreet.toFixed(0)}%</span>
+        </div>
+        <div style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: amt > tenant.unitGroupMedian ? '#FEF2F2' : '#ECFDF5' }}>
+          <span style={{ color: C.textMuted }}>vs Median </span>
+          <span style={{ fontWeight: 600, color: amt > tenant.unitGroupMedian ? C.negative : C.positive }}>{pctOfMedian.toFixed(0)}%</span>
+        </div>
+        <div style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, background: C.bg }}>
+          <span style={{ color: C.textMuted }}>+</span>
+          <span style={{ fontWeight: 600, color: C.textPrimary }}>${Math.round(amt - tenant.currentRent)}/mo · ${Math.round((amt - tenant.currentRent) * 12)}/yr</span>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Shared: reason + action bar ──
+  const renderReasonAndActions = (tenant: ECRITenant, compact = false) => {
+    const isActive = modifyingTenantId === tenant.id;
+    const amt = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+    const modified = amt !== tenant.recommendedNewRent;
+    return (
+      <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {modified && (
+          <select value={modifyReason} onChange={e => setModifyReason(e.target.value)}
+            style={{ padding: '5px 8px', borderRadius: 4, border: `1px solid ${C.border}`, fontSize: 11, outline: 'none', color: modifyReason ? C.textPrimary : C.textMuted, maxWidth: 200 }}>
+            <option value="">Override reason...</option>
+            {OVERRIDE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        )}
+        <button onClick={() => { if (modified && modifyReason) { handleModify(tenant.id); } else if (!modified) { handleApprove(tenant.id); } }}
+          disabled={modified && !modifyReason}
+          style={{ padding: compact ? '4px 14px' : '6px 18px', borderRadius: 6, border: 'none', cursor: 'pointer', background: (modified && !modifyReason) ? '#94A3B8' : C.positive, color: '#fff', fontSize: compact ? 12 : 13, fontWeight: 600 }}>
+          {modified ? `Save $${amt}` : `Approve $${tenant.recommendedNewRent}`}
+        </button>
+        <button onClick={() => handleSkip(tenant.id)}
+          style={{ padding: compact ? '4px 14px' : '6px 14px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.textSecondary, fontSize: compact ? 12 : 13 }}>
+          Skip
+        </button>
+      </div>
+    );
+  };
+
+  // ── Shared: history badges ──
+  const renderHistory = (tenant: ECRITenant) => (
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+      {tenant.previousIncreases.length > 0 ? tenant.previousIncreases.map((pi, i) => (
+        <span key={i} style={{ padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: C.bg, color: C.textSecondary }}>+${pi.amount} {pi.date}</span>
+      )) : <span style={{ fontSize: 10, color: C.textMuted }}>No prior increases</span>}
+      {tenant.isFirstECRI && <FlagBadge label="1st ECRI" color={C.info} />}
+      {tenant.smartCatchUp && <FlagBadge label="Smart Catch-Up" color={C.aiAccent} />}
+    </div>
+  );
+
+  // ── All tenants flat list (for versions C, D, E) ──
+  const allFilteredTenants = useMemo(() => groupedTenants.flatMap(g => g.tenants), [groupedTenants]);
+
   // ── Render ──
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: C.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -1171,6 +1268,23 @@ export default function ECRIDashboard() {
                 {ecriSubTab === 'recommendations' && (
                   <>
                     <div style={{ flex: 1 }} />
+                    {/* Layout version selector */}
+                    <div style={{ display: 'flex', gap: 2, background: C.bg, borderRadius: 6, padding: 2 }}>
+                      {(['A', 'B', 'C', 'D', 'E'] as const).map(v => (
+                        <button
+                          key={v}
+                          onClick={() => setLayoutVersion(v)}
+                          style={{
+                            padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                            border: 'none', cursor: 'pointer',
+                            background: layoutVersion === v ? C.activeNav : 'transparent',
+                            color: layoutVersion === v ? '#fff' : C.textMuted,
+                          }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
                     <input
                       type="text"
                       placeholder="Search tenants..."
@@ -1203,16 +1317,350 @@ export default function ECRIDashboard() {
               </div>
 
               {/* ── Tenant List (scrollable) ── */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: layoutVersion === 'D' ? 0 : '16px 24px', display: layoutVersion === 'D' ? 'flex' : 'block' }}>
                 {groupedTenants.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: 48, color: C.textMuted, fontSize: 14 }}>
+                  <div style={{ textAlign: 'center', padding: 48, color: C.textMuted, fontSize: 14, flex: 1 }}>
                     {facilityTenants.length === 0
                       ? 'No ECRI recommendations loaded for this facility.'
                       : 'No tenants match the current filter.'}
                   </div>
                 )}
 
-                {groupedTenants.map(group => {
+                {/* ═══════════ VERSION E: FOCUS MODE ═══════════ */}
+                {layoutVersion === 'E' && allFilteredTenants.length > 0 && (() => {
+                  const idx = Math.min(focusIndex, allFilteredTenants.length - 1);
+                  const t = allFilteredTenants[idx];
+                  if (!t || t.status !== 'pending') {
+                    const nextPending = allFilteredTenants.findIndex((x, i) => i > idx && x.status === 'pending');
+                    if (nextPending >= 0 && nextPending !== idx) { setTimeout(() => setFocusIndex(nextPending), 0); }
+                  }
+                  const { risk, rc } = riskScore(t);
+                  const isActive = modifyingTenantId === t.id;
+                  if (!isActive && modifyingTenantId !== t.id) {
+                    // auto-activate for focus mode
+                  }
+                  return (
+                    <div style={{ maxWidth: 700, margin: '0 auto', padding: '24px 32px' }}>
+                      {/* Progress */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                        <span style={{ fontSize: 12, color: C.textMuted }}>{idx + 1} of {allFilteredTenants.length}</span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => setFocusIndex(Math.max(0, idx - 1))} disabled={idx === 0}
+                            style={{ padding: '4px 12px', borderRadius: 4, border: `1px solid ${C.border}`, background: C.card, cursor: 'pointer', fontSize: 12, color: C.textSecondary }}>← Prev</button>
+                          <button onClick={() => setFocusIndex(Math.min(allFilteredTenants.length - 1, idx + 1))} disabled={idx >= allFilteredTenants.length - 1}
+                            style={{ padding: '4px 12px', borderRadius: 4, border: `1px solid ${C.border}`, background: C.card, cursor: 'pointer', fontSize: 12, color: C.textSecondary }}>Next →</button>
+                        </div>
+                      </div>
+
+                      {/* Tenant header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <span style={{ padding: '3px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 700, color: '#fff', background: tierColor(t.assignedTier) }}>T{t.assignedTier}</span>
+                        <span style={{ fontSize: 22, fontWeight: 700, color: C.textPrimary }}>{t.customerName}</span>
+                        <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: '#EFF6FF', color: C.info }}>{t.unitType}</span>
+                        <span style={{ fontSize: 13, color: C.textSecondary }}>Unit {t.unitNumber} · {t.tenureMonths} mo</span>
+                        <span style={{ marginLeft: 'auto', padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600, color: rc, background: `${rc}15`, border: `1px solid ${rc}30` }}>{risk} Risk</span>
+                      </div>
+
+                      {/* Big pricing boxes */}
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                        {[
+                          { label: 'PAYING', value: `$${t.currentRent}`, bg: C.bg, color: C.textPrimary },
+                          { label: 'MEDIAN', value: `$${t.unitGroupMedian}`, bg: C.bg, color: C.textPrimary },
+                          { label: 'STREET', value: `$${t.streetRate}`, bg: C.bg, color: C.textPrimary },
+                        ].map(b => (
+                          <div key={b.label} style={{ flex: 1, padding: '14px 16px', borderRadius: 10, background: b.bg, textAlign: 'center' }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, letterSpacing: 1, marginBottom: 4 }}>{b.label}</div>
+                            <div style={{ fontSize: 24, fontWeight: 700, color: b.color }}>{b.value}</div>
+                          </div>
+                        ))}
+                        <div style={{ flex: 1, padding: '14px 16px', borderRadius: 10, background: '#ECFDF5', textAlign: 'center', border: `2px solid ${C.positive}` }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: C.positive, letterSpacing: 1, marginBottom: 4 }}>PROPOSAL</div>
+                          <div style={{ fontSize: 24, fontWeight: 700, color: C.positive }}>${modifyingTenantId === t.id ? (parseFloat(modifyAmount) || t.recommendedNewRent) : t.recommendedNewRent}</div>
+                          <div style={{ fontSize: 11, color: C.textSecondary, marginTop: 2 }}>+${t.recommendedIncrease} (+{(t.tierPercent * 100).toFixed(0)}%)</div>
+                        </div>
+                      </div>
+
+                      {/* Toggle buttons */}
+                      <div style={{ marginBottom: 16 }} onClick={() => { if (modifyingTenantId !== t.id) { setModifyingTenantId(t.id); setModifyAmount(String(t.recommendedNewRent)); setModifyReason(''); } }}>
+                        {renderToggleButtons(t)}
+                      </div>
+
+                      {/* Metric chips */}
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                        {[
+                          { label: 'vs Street', val: `${t.tenantVsStreet >= 0 ? '+' : ''}${(t.tenantVsStreet * 100).toFixed(1)}%`, bg: t.tenantVsStreet > 0 ? '#FEF2F2' : '#ECFDF5', color: t.tenantVsStreet > 0 ? C.negative : C.positive },
+                          { label: 'vs Median', val: `${t.newRateDeltaToMedian >= 0 ? '+' : ''}${(t.newRateDeltaToMedian * 100).toFixed(1)}%`, bg: C.bg, color: C.textPrimary },
+                          { label: 'Occupancy', val: `${(t.unitGroupOccupancy * 100).toFixed(0)}%`, bg: t.unitGroupOccupancy > 0.85 ? '#ECFDF5' : '#FFFBEB', color: t.unitGroupOccupancy > 0.85 ? C.positive : C.warning },
+                          { label: '$/yr Impact', val: `$${t.recommendedIncrease * 12}`, bg: C.bg, color: C.textPrimary },
+                        ].map(m => (
+                          <div key={m.label} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, background: m.bg, minWidth: 100 }}>
+                            <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>{m.label}</div>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: m.color }}>{m.val}</div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* History + Competitors + Rationale */}
+                      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 200, padding: 12, borderRadius: 8, background: C.bg }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Increase History</div>
+                          {renderHistory(t)}
+                        </div>
+                        {t.competitors.length > 0 && (
+                          <div style={{ flex: 1, minWidth: 200, padding: 12, borderRadius: 8, background: C.bg }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Competitors</div>
+                            {t.competitors.map((comp, ci) => (
+                              <div key={ci} style={{ fontSize: 11, color: C.textSecondary, marginBottom: 2 }}>
+                                <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 3, textAlign: 'center', lineHeight: '16px', fontSize: 9, fontWeight: 700, color: '#fff', background: qualityColor(comp.quality), marginRight: 4, verticalAlign: 'middle' }}>{comp.quality}</span>
+                                {comp.name} <strong>${comp.rate}</strong> · {comp.distance}mi
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Override reason + Action buttons */}
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '16px 0', borderTop: `1px solid ${C.border}` }}>
+                        {modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && (
+                          <select value={modifyReason} onChange={e => setModifyReason(e.target.value)}
+                            style={{ padding: '8px 12px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, outline: 'none', color: modifyReason ? C.textPrimary : C.textMuted }}>
+                            <option value="">Override reason...</option>
+                            {OVERRIDE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        )}
+                        <div style={{ flex: 1 }} />
+                        <button onClick={() => { if (modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && modifyReason) { handleModify(t.id); } else { handleApprove(t.id); } setFocusIndex(Math.min(allFilteredTenants.length - 1, idx + 1)); }}
+                          disabled={modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && !modifyReason}
+                          style={{ padding: '10px 32px', borderRadius: 8, border: 'none', cursor: 'pointer', background: C.positive, color: '#fff', fontSize: 15, fontWeight: 700 }}>
+                          {modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent ? `Save $${parseFloat(modifyAmount)}` : `Approve $${t.recommendedNewRent}`} →
+                        </button>
+                        <button onClick={() => { handleSkip(t.id); setFocusIndex(Math.min(allFilteredTenants.length - 1, idx + 1)); }}
+                          style={{ padding: '10px 24px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.textSecondary, fontSize: 15 }}>
+                          Skip →
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ═══════════ VERSION D: SPLIT PANEL ═══════════ */}
+                {layoutVersion === 'D' && allFilteredTenants.length > 0 && (() => {
+                  const selectedT = allFilteredTenants.find(t => t.id === expandedTenantId) || allFilteredTenants[0];
+                  return (
+                    <>
+                      {/* Left: compact list */}
+                      <div style={{ width: 320, borderRight: `1px solid ${C.border}`, overflowY: 'auto', padding: '8px 0', flexShrink: 0 }}>
+                        {allFilteredTenants.map(t => {
+                          const sel = t.id === (expandedTenantId || allFilteredTenants[0]?.id);
+                          const done = t.status !== 'pending';
+                          return (
+                            <div key={t.id} onClick={() => { setExpandedTenantId(t.id); setModifyingTenantId(null); setModifyAmount(''); setModifyReason(''); }}
+                              style={{
+                                padding: '8px 14px', cursor: 'pointer',
+                                background: sel ? '#EFF6FF' : done ? '#F9FAFB' : 'transparent',
+                                borderLeft: sel ? `3px solid ${C.info}` : '3px solid transparent',
+                                borderBottom: `1px solid ${C.border}`, opacity: done ? 0.6 : 1,
+                              }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ padding: '1px 6px', borderRadius: 9999, fontSize: 9, fontWeight: 700, color: '#fff', background: tierColor(t.assignedTier) }}>T{t.assignedTier}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: C.textPrimary, flex: 1 }}>{t.customerName}</span>
+                                {done && <span style={{ fontSize: 10, color: t.status === 'skipped' ? C.textMuted : C.positive }}>{t.status === 'skipped' ? '✗' : '✓'}</span>}
+                              </div>
+                              <div style={{ fontSize: 11, color: C.textSecondary, marginTop: 2, paddingLeft: 28 }}>
+                                ${t.currentRent} → ${t.status === 'modified' || t.status === 'approved' ? t.approvedAmount : t.recommendedNewRent}
+                                <span style={{ color: C.positive, marginLeft: 4 }}>+${t.status === 'modified' || t.status === 'approved' ? (t.approvedAmount || 0) - t.currentRent : t.recommendedIncrease}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Right: detail */}
+                      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+                        {selectedT && (() => {
+                          const t = selectedT;
+                          const { risk, rc } = riskScore(t);
+                          return (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                                <span style={{ padding: '3px 12px', borderRadius: 9999, fontSize: 12, fontWeight: 700, color: '#fff', background: tierColor(t.assignedTier) }}>T{t.assignedTier}</span>
+                                <span style={{ fontSize: 20, fontWeight: 700, color: C.textPrimary }}>{t.customerName}</span>
+                                <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600, background: '#EFF6FF', color: C.info }}>{t.unitType}</span>
+                                <span style={{ fontSize: 12, color: C.textSecondary }}>Unit {t.unitNumber} · {t.tenureMonths} mo</span>
+                                <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600, color: rc, background: `${rc}15` }}>{risk} Risk</span>
+                              </div>
+
+                              {/* Pricing row */}
+                              <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                                {[
+                                  { label: 'Paying', value: `$${t.currentRent}` },
+                                  { label: 'Median', value: `$${t.unitGroupMedian}` },
+                                  { label: 'Street', value: `$${t.streetRate}` },
+                                ].map(b => (
+                                  <div key={b.label} style={{ padding: '10px 16px', borderRadius: 8, background: C.bg, textAlign: 'center', flex: 1 }}>
+                                    <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>{b.label}</div>
+                                    <div style={{ fontSize: 20, fontWeight: 700, color: C.textPrimary }}>{b.value}</div>
+                                  </div>
+                                ))}
+                                <div style={{ padding: '10px 16px', borderRadius: 8, background: '#ECFDF5', textAlign: 'center', flex: 1, border: `2px solid ${C.positive}` }}>
+                                  <div style={{ fontSize: 10, color: C.positive, marginBottom: 2 }}>Proposal</div>
+                                  <div style={{ fontSize: 20, fontWeight: 700, color: C.positive }}>${modifyingTenantId === t.id ? (parseFloat(modifyAmount) || t.recommendedNewRent) : t.recommendedNewRent}</div>
+                                </div>
+                              </div>
+
+                              {/* Toggles */}
+                              <div style={{ marginBottom: 12 }} onClick={() => { if (modifyingTenantId !== t.id) { setModifyingTenantId(t.id); setModifyAmount(String(t.recommendedNewRent)); setModifyReason(''); } }}>
+                                {renderToggleButtons(t)}
+                              </div>
+                              {modifyingTenantId === t.id && <div style={{ marginBottom: 12 }}>{renderPositionChips(t)}</div>}
+
+                              {/* Metrics + History */}
+                              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                                <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: t.tenantVsStreet > 0 ? '#FEF2F2' : '#ECFDF5' }}>
+                                  <span style={{ color: C.textMuted }}>vs Street </span><span style={{ fontWeight: 600, color: t.tenantVsStreet > 0 ? C.negative : C.positive }}>{t.tenantVsStreet >= 0 ? '+' : ''}{(t.tenantVsStreet * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: C.bg }}>
+                                  <span style={{ color: C.textMuted }}>Trial vs Med </span><span style={{ fontWeight: 600 }}>{t.newRateDeltaToMedian >= 0 ? '+' : ''}{(t.newRateDeltaToMedian * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: t.unitGroupOccupancy > 0.85 ? '#ECFDF5' : '#FFFBEB' }}>
+                                  <span style={{ color: C.textMuted }}>Occ </span><span style={{ fontWeight: 600, color: t.unitGroupOccupancy > 0.85 ? C.positive : C.warning }}>{(t.unitGroupOccupancy * 100).toFixed(0)}%</span>
+                                </div>
+                              </div>
+                              <div style={{ marginBottom: 14 }}>{renderHistory(t)}</div>
+
+                              {/* Competitors */}
+                              {t.competitors.length > 0 && (
+                                <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: C.bg }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.textSecondary, marginBottom: 6 }}>Competitors</div>
+                                  {t.competitors.map((comp, ci) => (
+                                    <div key={ci} style={{ fontSize: 11, color: C.textSecondary, marginBottom: 2 }}>
+                                      <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: 3, textAlign: 'center', lineHeight: '16px', fontSize: 9, fontWeight: 700, color: '#fff', background: qualityColor(comp.quality), marginRight: 4, verticalAlign: 'middle' }}>{comp.quality}</span>
+                                      {comp.name} <strong>${comp.rate}</strong> · {comp.distance}mi
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Actions */}
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '14px 0', borderTop: `1px solid ${C.border}` }}>
+                                {modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && (
+                                  <select value={modifyReason} onChange={e => setModifyReason(e.target.value)}
+                                    style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, outline: 'none', color: modifyReason ? C.textPrimary : C.textMuted }}>
+                                    <option value="">Override reason...</option>
+                                    {OVERRIDE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                  </select>
+                                )}
+                                <div style={{ flex: 1 }} />
+                                <button onClick={() => { if (modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && modifyReason) { handleModify(t.id); } else { handleApprove(t.id); } }}
+                                  disabled={modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent && !modifyReason}
+                                  style={{ padding: '8px 24px', borderRadius: 6, border: 'none', cursor: 'pointer', background: C.positive, color: '#fff', fontSize: 14, fontWeight: 700 }}>
+                                  {modifyingTenantId === t.id && parseFloat(modifyAmount) !== t.recommendedNewRent ? `Save $${parseFloat(modifyAmount)}` : `Approve $${t.recommendedNewRent}`}
+                                </button>
+                                <button onClick={() => handleSkip(t.id)}
+                                  style={{ padding: '8px 20px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.textSecondary, fontSize: 14 }}>
+                                  Skip
+                                </button>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {/* ═══════════ VERSION C: COMPACT TABLE ═══════════ */}
+                {layoutVersion === 'C' && groupedTenants.length > 0 && (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: C.card }}>
+                      <tr style={{ borderBottom: `2px solid ${C.border}` }}>
+                        {['Tier', 'Name', 'Type', 'Tenure', 'Paying', 'Median', 'Street', 'Proposal', 'Δ$/mo', 'Risk', ''].map(h => (
+                          <th key={h} style={{ padding: '8px 8px', fontWeight: 600, color: C.textMuted, fontSize: 11, textAlign: h === 'Name' || h === 'Type' ? 'left' : 'right', whiteSpace: 'nowrap', background: C.card }}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allFilteredTenants.map(t => {
+                        const { risk, rc } = riskScore(t);
+                        const isExp = expandedTenantId === t.id;
+                        const done = t.status !== 'pending';
+                        return (
+                          <Fragment key={t.id}>
+                            <tr onClick={() => { setExpandedTenantId(isExp ? null : t.id); if (!isExp) { setModifyingTenantId(t.id); setModifyAmount(String(t.recommendedNewRent)); setModifyReason(''); } }}
+                              style={{ borderBottom: `1px solid ${C.border}`, cursor: 'pointer', background: done ? '#F9FAFB' : isExp ? '#EFF6FF' : 'transparent', opacity: done ? 0.6 : 1 }}>
+                              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                <span style={{ padding: '1px 8px', borderRadius: 9999, fontSize: 10, fontWeight: 700, color: '#fff', background: tierColor(t.assignedTier) }}>T{t.assignedTier}</span>
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: 500 }}>
+                                {done && <span style={{ color: t.status === 'skipped' ? C.textMuted : C.positive, marginRight: 4 }}>{t.status === 'skipped' ? '✗' : '✓'}</span>}
+                                {t.customerName}
+                              </td>
+                              <td style={{ padding: '6px 8px', color: C.textSecondary }}>{t.unitType}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: C.textSecondary }}>{t.tenureMonths}mo</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>${t.currentRent}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: C.textSecondary }}>${t.unitGroupMedian}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', color: C.textSecondary }}>${t.streetRate}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: C.positive }}>${done ? t.approvedAmount || t.recommendedNewRent : t.recommendedNewRent}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: C.positive }}>+${done ? (t.approvedAmount || t.recommendedNewRent) - t.currentRent : t.recommendedIncrease}</td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                <span style={{ padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 600, color: rc, background: `${rc}15` }}>{risk}</span>
+                              </td>
+                              <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                                {!done && (
+                                  <button onClick={e => { e.stopPropagation(); handleApprove(t.id); }}
+                                    style={{ padding: '2px 10px', borderRadius: 4, border: 'none', background: C.positive, color: '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer', marginRight: 4 }}>✓</button>
+                                )}
+                                {!done && (
+                                  <button onClick={e => { e.stopPropagation(); handleSkip(t.id); }}
+                                    style={{ padding: '2px 10px', borderRadius: 4, border: `1px solid ${C.border}`, background: 'transparent', color: C.textMuted, fontSize: 10, cursor: 'pointer' }}>✗</button>
+                                )}
+                                {done && undoAvailable.has(t.id) && (
+                                  <button onClick={e => { e.stopPropagation(); handleUndo(t.id); }}
+                                    style={{ padding: '2px 8px', borderRadius: 4, border: `1px solid ${C.border}`, background: C.card, color: C.textSecondary, fontSize: 10, cursor: 'pointer' }}>Undo</button>
+                                )}
+                              </td>
+                            </tr>
+                            {isExp && !done && (
+                              <tr><td colSpan={11} style={{ padding: 0, borderBottom: `1px solid ${C.border}` }}>
+                                <div onClick={e => e.stopPropagation()} style={{ padding: '12px 20px', background: C.bg }}>
+                                  <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                    <div style={{ flex: 1, minWidth: 280 }}>
+                                      {renderToggleButtons(t)}
+                                      <div style={{ marginTop: 8 }}>{renderPositionChips(t)}</div>
+                                      <div style={{ marginTop: 8 }}>{renderHistory(t)}</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                      {parseFloat(modifyAmount) !== t.recommendedNewRent && (
+                                        <select value={modifyReason} onChange={e => setModifyReason(e.target.value)}
+                                          style={{ padding: '5px 8px', borderRadius: 4, border: `1px solid ${C.border}`, fontSize: 11, color: modifyReason ? C.textPrimary : C.textMuted }}>
+                                          <option value="">Reason...</option>
+                                          {OVERRIDE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                                        </select>
+                                      )}
+                                      <button onClick={() => { if (parseFloat(modifyAmount) !== t.recommendedNewRent && modifyReason) { handleModify(t.id); } else { handleApprove(t.id); } }}
+                                        disabled={parseFloat(modifyAmount) !== t.recommendedNewRent && !modifyReason}
+                                        style={{ padding: '6px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', background: C.positive, color: '#fff', fontSize: 12, fontWeight: 600 }}>
+                                        {parseFloat(modifyAmount) !== t.recommendedNewRent ? `Save $${parseFloat(modifyAmount)}` : `Approve $${t.recommendedNewRent}`}
+                                      </button>
+                                      <button onClick={() => handleSkip(t.id)}
+                                        style={{ padding: '6px 12px', borderRadius: 6, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.textSecondary, fontSize: 12 }}>
+                                        Skip
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td></tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+
+                {/* ═══════════ VERSIONS A & B: CARD LAYOUTS ═══════════ */}
+                {(layoutVersion === 'A' || layoutVersion === 'B') && groupedTenants.map(group => {
                   const isGroupCollapsed = collapsedGroups.has(group.key);
                   const gpRev = groupPotentialRevenue(group);
                   const gpPending = groupPendingCount(group);
@@ -1318,7 +1766,12 @@ export default function ECRIDashboard() {
                                 <span style={{ color: isModified ? C.warning : C.positive, fontWeight: 600 }}>
                                   {isModified ? '✎' : '✓'}
                                 </span>
-                                {tenant.customerName} · ${tenant.currentRent} → ${tenant.approvedAmount}
+                                {tenant.customerName}
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600,
+                                  background: '#EFF6FF', color: C.info, marginLeft: 2,
+                                }}>{tenant.unitType}</span>
+                                {' '}· ${tenant.currentRent} → ${tenant.approvedAmount}
                                 {' '}(+${increase}/mo, +{((increase / tenant.currentRent) * 100).toFixed(0)}%)
                                 {isModified && tenant.overrideReason && (
                                   <span style={{ color: C.textMuted }}> · {tenant.overrideReason}</span>
@@ -1370,7 +1823,7 @@ export default function ECRIDashboard() {
                         // ── PENDING STATE ──
                         const isExpanded = expandedTenantId === tenant.id;
                         const isModifying = modifyingTenantId === tenant.id;
-                        const hasFlags = tenant.isAboveStreet || tenant.isSeasonalLowRate || tenant.isMultiUnit || tenant.isLeaseUp;
+                        const hasFlags = tenant.isAboveStreet || tenant.isSeasonalLowRate || tenant.isMultiUnit || tenant.isLeaseUp || tenant.smartCatchUp;
 
                         return (
                           <div
@@ -1385,7 +1838,7 @@ export default function ECRIDashboard() {
                               transition: 'border-color 0.15s ease',
                             }}
                           >
-                            {/* Row 1: Tier badge + Name + Unit info */}
+                            {/* Row 1: Tier badge + Name + Unit type (prominent) */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{
                                 padding: '2px 10px', borderRadius: 9999, fontSize: 11, fontWeight: 700,
@@ -1397,58 +1850,140 @@ export default function ECRIDashboard() {
                               <span style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary }}>
                                 {tenant.customerName}
                               </span>
+                              <span style={{
+                                padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                background: '#EFF6FF', color: C.info,
+                              }}>
+                                {tenant.unitType}
+                              </span>
                               <span style={{ fontSize: 12, color: C.textSecondary }}>
-                                {tenant.unitType} · Unit {tenant.unitNumber} · {tenant.tenureMonths} mo
+                                Unit {tenant.unitNumber} · {tenant.tenureMonths} mo
                               </span>
+                              {/* Risk score */}
+                              {(() => {
+                                const dollarIncrease = tenant.recommendedIncrease;
+                                const pctIncrease = tenant.tierPercent;
+                                const aboveStreet = tenant.isAboveStreet;
+                                const risk = aboveStreet || (pctIncrease >= 0.40 && dollarIncrease > 40)
+                                  ? 'High' : pctIncrease >= 0.20 || dollarIncrease > 25
+                                  ? 'Med' : 'Low';
+                                const rc = risk === 'High' ? C.negative : risk === 'Med' ? C.warning : C.positive;
+                                return (
+                                  <span style={{
+                                    marginLeft: 'auto', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                    color: rc, background: `${rc}15`, border: `1px solid ${rc}30`,
+                                  }}>
+                                    {risk} Risk
+                                  </span>
+                                );
+                              })()}
                             </div>
 
-                            {/* Row 2: Price change */}
-                            <div style={{ fontSize: 14, fontWeight: 600, marginTop: 8, paddingLeft: 8 }}>
-                              <span style={{ color: C.textPrimary }}>${tenant.currentRent}/mo</span>
-                              <span style={{ color: C.textMuted }}> → </span>
-                              <span style={{ color: C.textPrimary }}>${tenant.recommendedNewRent}/mo</span>
-                              <span style={{ color: C.positive, fontSize: 13, marginLeft: 8 }}>
-                                (+${tenant.recommendedIncrease}, +{(tenant.tierPercent * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-
-                            {/* Row 3: Key metrics */}
-                            <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingLeft: 8, flexWrap: 'wrap' }}>
-                              <div style={{
-                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
-                                background: tenant.tenantVsStreet > 0 ? '#FEF2F2' : '#ECFDF5',
-                                color: tenant.tenantVsStreet > 0 ? C.negative : C.positive,
-                              }}>
-                                <span style={{ color: C.textMuted }}>vs Street </span>
-                                <span style={{ fontWeight: 600 }}>{tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}%</span>
-                              </div>
-                              <div style={{
-                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
-                                background: C.bg,
-                              }}>
-                                <span style={{ color: C.textMuted }}>Trial vs Median </span>
-                                <span style={{ fontWeight: 600, color: C.textPrimary }}>{tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}%</span>
-                              </div>
-                              <div style={{
-                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
-                                background: tenant.unitGroupOccupancy > 0.85 ? '#ECFDF5' : tenant.unitGroupOccupancy >= 0.75 ? '#FFFBEB' : '#FEF2F2',
-                                color: tenant.unitGroupOccupancy > 0.85 ? C.positive : tenant.unitGroupOccupancy >= 0.75 ? C.warning : C.negative,
-                              }}>
-                                <span style={{ color: C.textMuted }}>Occupancy </span>
-                                <span style={{ fontWeight: 600 }}>{(tenant.unitGroupOccupancy * 100).toFixed(0)}%</span>
-                              </div>
-                            </div>
-
-                            {/* Row 4: Flag badges */}
-                            {(hasFlags || tenant.isFirstECRI) && (
-                              <div style={{ display: 'flex', gap: 6, marginTop: 6, paddingLeft: 8, flexWrap: 'wrap' }}>
-                                {tenant.isAboveStreet && <FlagBadge label="Above Street" color={C.negative} />}
-                                {tenant.isSeasonalLowRate && <FlagBadge label="Seasonal Low" color={C.warning} />}
-                                {tenant.isMultiUnit && <FlagBadge label="Multi-Unit" color={C.info} />}
-                                {tenant.isLeaseUp && <FlagBadge label="Lease-Up" color={C.aiAccent} />}
-                                {tenant.isFirstECRI && <FlagBadge label="1st ECRI" color={C.info} />}
+                            {/* Row 2: Pricing summary */}
+                            {layoutVersion === 'A' && (
+                              <div style={{ display: 'flex', gap: 6, marginTop: 10, paddingLeft: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <div style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, background: C.bg }}>
+                                  <span style={{ color: C.textMuted }}>Paying </span>
+                                  <span style={{ fontWeight: 700, color: C.textPrimary }}>${tenant.currentRent}</span>
+                                </div>
+                                <div style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, background: C.bg }}>
+                                  <span style={{ color: C.textMuted }}>Median </span>
+                                  <span style={{ fontWeight: 700, color: C.textPrimary }}>${tenant.unitGroupMedian}</span>
+                                </div>
+                                <div style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, background: C.bg }}>
+                                  <span style={{ color: C.textMuted }}>Street </span>
+                                  <span style={{ fontWeight: 700, color: C.textPrimary }}>${tenant.streetRate}</span>
+                                </div>
+                                <span style={{ fontSize: 16, color: C.textMuted, margin: '0 2px' }}>→</span>
+                                <div style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#ECFDF5', color: C.positive }}>
+                                  ${tenant.recommendedNewRent}
+                                  <span style={{ fontWeight: 500, marginLeft: 6, fontSize: 11 }}>+${tenant.recommendedIncrease} (+{(tenant.tierPercent * 100).toFixed(0)}%)</span>
+                                </div>
                               </div>
                             )}
+                            {layoutVersion === 'B' && (() => {
+                              const vals = [tenant.currentRent, tenant.unitGroupMedian, tenant.streetRate, tenant.recommendedNewRent];
+                              const min = Math.min(...vals) * 0.85;
+                              const max = Math.max(...vals) * 1.10;
+                              const range = max - min || 1;
+                              const pct = (v: number) => ((v - min) / range) * 100;
+                              const barW = '100%';
+                              return (
+                                <div style={{ marginTop: 10, paddingLeft: 8, paddingRight: 8 }}>
+                                  {/* Price line bar */}
+                                  <div style={{ position: 'relative', height: 40, marginBottom: 4 }}>
+                                    {/* Track */}
+                                    <div style={{ position: 'absolute', top: 18, left: 0, right: 0, height: 4, borderRadius: 2, background: '#E2E8F0' }} />
+                                    {/* Green zone: between current and proposal */}
+                                    <div style={{ position: 'absolute', top: 16, height: 8, borderRadius: 4, background: `${C.positive}20`, left: `${Math.min(pct(tenant.currentRent), pct(tenant.recommendedNewRent))}%`, width: `${Math.abs(pct(tenant.recommendedNewRent) - pct(tenant.currentRent))}%` }} />
+                                    {/* Markers */}
+                                    {[
+                                      { v: tenant.currentRent, label: `$${tenant.currentRent}`, sub: 'Paying', color: C.textPrimary, top: true },
+                                      { v: tenant.unitGroupMedian, label: `$${tenant.unitGroupMedian}`, sub: 'Median', color: C.textMuted, top: false },
+                                      { v: tenant.streetRate, label: `$${tenant.streetRate}`, sub: 'Street', color: C.info, top: false },
+                                      { v: tenant.recommendedNewRent, label: `$${tenant.recommendedNewRent}`, sub: `+$${tenant.recommendedIncrease}`, color: C.positive, top: true },
+                                    ].map((m, i) => (
+                                      <div key={i} style={{ position: 'absolute', left: `${pct(m.v)}%`, transform: 'translateX(-50%)', textAlign: 'center', top: m.top ? -2 : 24 }}>
+                                        <div style={{ width: 8, height: 8, borderRadius: 4, background: m.color, margin: m.top ? '0 auto 0' : '2px auto 0', position: m.top ? 'relative' : 'absolute', top: m.top ? 12 : -8, left: m.top ? 0 : '50%', transform: m.top ? 'none' : 'translateX(-50%)' }} />
+                                        <div style={{ fontSize: 11, fontWeight: 700, color: m.color, whiteSpace: 'nowrap', marginTop: m.top ? 0 : 0 }}>{m.label}</div>
+                                        <div style={{ fontSize: 9, color: C.textMuted }}>{m.sub}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div style={{ height: 24 }} /> {/* spacer for bottom labels */}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Row 3: Position metrics */}
+                            <div style={{ display: 'flex', gap: 6, marginTop: 6, paddingLeft: 8, flexWrap: 'wrap' }}>
+                              <div style={{
+                                padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                background: tenant.tenantVsStreet > 0 ? '#FEF2F2' : '#ECFDF5',
+                              }}>
+                                <span style={{ color: C.textMuted }}>vs Street </span>
+                                <span style={{ fontWeight: 600, color: tenant.tenantVsStreet > 0 ? C.negative : C.positive }}>
+                                  {tenant.tenantVsStreet >= 0 ? '+' : ''}{(tenant.tenantVsStreet * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: C.bg }}>
+                                <span style={{ color: C.textMuted }}>Trial vs Median </span>
+                                <span style={{ fontWeight: 600, color: C.textPrimary }}>
+                                  {tenant.newRateDeltaToMedian >= 0 ? '+' : ''}{(tenant.newRateDeltaToMedian * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div style={{
+                                padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                background: tenant.unitGroupOccupancy > 0.85 ? '#ECFDF5' : tenant.unitGroupOccupancy >= 0.75 ? '#FFFBEB' : '#FEF2F2',
+                              }}>
+                                <span style={{ color: C.textMuted }}>Occupancy </span>
+                                <span style={{ fontWeight: 600, color: tenant.unitGroupOccupancy > 0.85 ? C.positive : tenant.unitGroupOccupancy >= 0.75 ? C.warning : C.negative }}>
+                                  {(tenant.unitGroupOccupancy * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Row 4: Previous increases (visible without expanding) + flags */}
+                            <div style={{ display: 'flex', gap: 6, marginTop: 6, paddingLeft: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                              {tenant.previousIncreases.length > 0 ? (
+                                tenant.previousIncreases.map((pi, i) => (
+                                  <div key={i} style={{
+                                    padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                    background: C.bg, color: C.textSecondary,
+                                  }}>
+                                    +${pi.amount} {pi.date}
+                                  </div>
+                                ))
+                              ) : (
+                                <span style={{ fontSize: 10, color: C.textMuted }}>No prior increases</span>
+                              )}
+                              {tenant.isFirstECRI && <FlagBadge label="1st ECRI" color={C.info} />}
+                              {tenant.smartCatchUp && <FlagBadge label="Smart Catch-Up" color={C.aiAccent} />}
+                              {tenant.isAboveStreet && <FlagBadge label="Above Street" color={C.negative} />}
+                              {tenant.isSeasonalLowRate && <FlagBadge label="Seasonal Low" color={C.warning} />}
+                              {tenant.isMultiUnit && <FlagBadge label="Multi-Unit" color={C.info} />}
+                              {tenant.isLeaseUp && <FlagBadge label="Lease-Up" color={C.aiAccent} />}
+                            </div>
 
                             {/* Row 5: Actions */}
                             <div
@@ -1497,14 +2032,61 @@ export default function ECRIDashboard() {
                             </div>
 
                             {/* ── INLINE MODIFY FLOW ── */}
-                            {isModifying && (
+                            {isModifying && (() => {
+                              const amt = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+                              const pctFromCurrent = ((amt - tenant.currentRent) / tenant.currentRent * 100);
+                              const pctOfStreet = ((amt / tenant.streetRate) * 100);
+                              const pctOfMedian = ((amt / tenant.unitGroupMedian) * 100);
+                              const posColor = amt > tenant.streetRate ? C.negative : amt >= tenant.streetRate * 0.9 ? C.positive : C.warning;
+                              return (
                               <div onClick={e => e.stopPropagation()} style={{
                                 marginTop: 12, padding: 14, borderRadius: 8,
                                 background: '#FFFBEB', border: `1px solid #FDE68A`,
                               }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: C.warning, marginBottom: 8 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: C.warning, marginBottom: 10 }}>
                                   Modify Recommendation
                                 </div>
+
+                                {/* Quick toggle buttons */}
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                                  {[-10, -5, 5, 10].map(pct => (
+                                    <button
+                                      key={pct}
+                                      onClick={() => {
+                                        const cur = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+                                        setModifyAmount(String(Math.round(cur * (1 + pct / 100))));
+                                      }}
+                                      style={{
+                                        padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                        border: `1px solid ${pct < 0 ? '#FECACA' : '#BBF7D0'}`,
+                                        background: pct < 0 ? '#FEF2F2' : '#F0FDF4',
+                                        color: pct < 0 ? C.negative : C.positive,
+                                      }}
+                                    >
+                                      {pct > 0 ? '+' : ''}{pct}%
+                                    </button>
+                                  ))}
+                                  <span style={{ width: 1, background: C.border, margin: '0 4px' }} />
+                                  {[-10, -5, 5, 10].map(d => (
+                                    <button
+                                      key={`d${d}`}
+                                      onClick={() => {
+                                        const cur = parseFloat(modifyAmount) || tenant.recommendedNewRent;
+                                        setModifyAmount(String(Math.round(cur + d)));
+                                      }}
+                                      style={{
+                                        padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                        border: `1px solid ${d < 0 ? '#FECACA' : '#BBF7D0'}`,
+                                        background: d < 0 ? '#FEF2F2' : '#F0FDF4',
+                                        color: d < 0 ? C.negative : C.positive,
+                                      }}
+                                    >
+                                      {d > 0 ? '+' : ''}{d < 0 ? '−' : ''}${Math.abs(d)}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {/* Amount input + live calc */}
                                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                                   <label style={{ fontSize: 12, color: C.textSecondary }}>New rent: $</label>
                                   <input
@@ -1517,11 +2099,38 @@ export default function ECRIDashboard() {
                                     }}
                                   />
                                   <span style={{ fontSize: 12, color: C.textMuted }}>
-                                    (+{modifyAmount ? ((parseFloat(modifyAmount) - tenant.currentRent) / tenant.currentRent * 100).toFixed(1) : '0'}%
-                                    · +${modifyAmount ? Math.round(parseFloat(modifyAmount) - tenant.currentRent) : 0}/mo)
+                                    (+{pctFromCurrent.toFixed(1)}% · +${Math.round(amt - tenant.currentRent)}/mo)
                                   </span>
                                 </div>
-                                <div style={{ marginTop: 8 }}>
+
+                                {/* Position indicator chips */}
+                                <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                                  <div style={{
+                                    padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                    background: amt > tenant.streetRate ? '#FEF2F2' : amt >= tenant.streetRate * 0.9 ? '#ECFDF5' : '#FFFBEB',
+                                  }}>
+                                    <span style={{ color: C.textMuted }}>vs Street </span>
+                                    <span style={{ fontWeight: 600, color: posColor }}>
+                                      {pctOfStreet.toFixed(0)}% (${Math.round(amt - tenant.streetRate)})
+                                    </span>
+                                  </div>
+                                  <div style={{
+                                    padding: '3px 10px', borderRadius: 6, fontSize: 11,
+                                    background: amt > tenant.unitGroupMedian ? '#FEF2F2' : '#ECFDF5',
+                                  }}>
+                                    <span style={{ color: C.textMuted }}>vs Median </span>
+                                    <span style={{ fontWeight: 600, color: amt > tenant.unitGroupMedian ? C.negative : C.positive }}>
+                                      {pctOfMedian.toFixed(0)}% (${Math.round(amt - tenant.unitGroupMedian)})
+                                    </span>
+                                  </div>
+                                  <div style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, background: C.bg }}>
+                                    <span style={{ color: C.textMuted }}>$ Increase </span>
+                                    <span style={{ fontWeight: 600, color: C.textPrimary }}>${Math.round(amt - tenant.currentRent)}/mo · ${Math.round((amt - tenant.currentRent) * 12)}/yr</span>
+                                  </div>
+                                </div>
+
+                                {/* Override reason */}
+                                <div style={{ marginTop: 10 }}>
                                   <select
                                     value={modifyReason}
                                     onChange={e => setModifyReason(e.target.value)}
@@ -1559,7 +2168,8 @@ export default function ECRIDashboard() {
                                   </button>
                                 </div>
                               </div>
-                            )}
+                              );
+                            })()}
 
                             {/* ── INLINE SKIP FLOW ── */}
                             {skipReasonId === tenant.id && (
@@ -1664,8 +2274,19 @@ export default function ECRIDashboard() {
 
                                   {/* Clean rationale sentence */}
                                   <div style={{ fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>
-                                    {tenant.assignedTier === 1 && (
+                                    {tenant.assignedTier === 1 && !tenant.smartCatchUp && (
                                       <>Trial rate is well below median (&lt; -20%) and occupancy exceeds 75% — aggressive catch-up recommended.</>
+                                    )}
+                                    {tenant.assignedTier === 1 && tenant.smartCatchUp && (
+                                      <>
+                                        <strong>Smart Catch-Up:</strong> 40% increase still leaves tenant well below street in a highly occupied group (≥90%).
+                                        Targeting ~90% of {tenant.unitGroupMedian >= tenant.streetRate ? 'street' : 'median'} rate
+                                        ({(tenant.tierPercent * 100).toFixed(0)}% increase) — anchored on{' '}
+                                        {tenant.unitGroupMedian >= tenant.streetRate
+                                          ? `street ($${tenant.streetRate}) with high confidence (median $${tenant.unitGroupMedian} ≥ street)`
+                                          : `median ($${tenant.unitGroupMedian}) since median is below street ($${tenant.streetRate})`
+                                        }.
+                                      </>
                                     )}
                                     {tenant.assignedTier === 2 && (
                                       <>Trial rate far exceeds median (&gt; +75%) — premium payer, conservative 10% increase to retain.</>
@@ -1738,20 +2359,6 @@ export default function ECRIDashboard() {
                                     </table>
                                   </div>
                                 )}
-
-                                {/* ECRI History */}
-                                <div style={{ fontSize: 12, color: C.textSecondary, paddingBottom: 4 }}>
-                                  {tenant.isFirstECRI && (
-                                    <span style={{
-                                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-                                      background: '#DBEAFE', color: C.info, fontSize: 11, fontWeight: 600, marginRight: 8,
-                                    }}>1st ECRI</span>
-                                  )}
-                                  {tenant.previousIncreases.length === 0
-                                    ? 'No previous increases'
-                                    : `${tenant.previousIncreases.length} previous increase${tenant.previousIncreases.length > 1 ? 's' : ''}: ${tenant.previousIncreases.map(pi => `+$${pi.amount} on ${pi.date}`).join(', ')}`
-                                  }
-                                </div>
 
                                 {/* DM Notes */}
                                 <div style={{ marginTop: 12 }}>

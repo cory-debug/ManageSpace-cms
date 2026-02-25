@@ -37,6 +37,7 @@ export interface ECRITenant {
   recommendedNewRent: number;
   recommendedIncrease: number;
   isAboveStreet: boolean;
+  smartCatchUp: boolean;
   isSeasonalLowRate: boolean;
   isMultiUnit: boolean;
   isLeaseUp: boolean;
@@ -56,6 +57,7 @@ export interface TierResult {
   trialRate: number;
   deltaMed: number;
   tvs: number;
+  smartCatchUp?: boolean; // true when Tier 1 uses aggressive catch-up
 }
 
 export const OVERRIDE_REASONS = [
@@ -74,6 +76,9 @@ export const OVERRIDE_REASONS = [
  * All tiers use 20% trial rate as starting point (confirmed by Brian Feb 12).
  *
  * Tier 1 (40%): newRateDeltaToMedian < -0.20 AND unitGroupOccupancy > 0.75
+ *   → Smart Catch-Up (Feb 19): If occ >= 90% AND 40% still leaves tenant >$25 below street
+ *     AND median >= street → target 90% of street (capped at 2x current rent)
+ *     If median < street → target 90% of median instead
  * Tier 2 (10%): newRateDeltaToMedian > 0.75
  * Tier 3 (15%): tenantVsStreet > 0.15 AND newRateDeltaToMedian > 0.15
  * Tier 4 (20%): default
@@ -89,6 +94,21 @@ export function computeTier(
   const tvs = (currentRent - streetRate) / streetRate;
 
   if (deltaMed < -0.20 && unitGroupOccupancy > 0.75) {
+    // Smart Catch-Up: when 40% isn't enough for highly occupied groups
+    const baseNewRent = currentRent * 1.40;
+    const gapToStreet = streetRate - baseNewRent;
+
+    if (unitGroupOccupancy >= 0.90 && gapToStreet > 25) {
+      // High confidence: median at or above street → target 90% of street
+      // Lower confidence: median below street → target 90% of median
+      const anchor = unitGroupMedian >= streetRate ? streetRate : unitGroupMedian;
+      const targetRent = Math.round(anchor * 0.90);
+      // Cap: never more than double the current rent
+      const cappedRent = Math.min(targetRent, currentRent * 2);
+      const smartPercent = (cappedRent - currentRent) / currentRent;
+      return { tier: 1, percent: Math.max(smartPercent, 0.40), trialRate, deltaMed, tvs, smartCatchUp: true };
+    }
+
     return { tier: 1, percent: 0.40, trialRate, deltaMed, tvs };
   }
   if (deltaMed > 0.75) {
@@ -123,7 +143,7 @@ export interface BuildTenantInput {
 }
 
 export function buildTenant(raw: BuildTenantInput): ECRITenant {
-  const { tier, percent, trialRate, deltaMed, tvs } = computeTier(
+  const { tier, percent, trialRate, deltaMed, tvs, smartCatchUp } = computeTier(
     raw.currentRent, raw.unitGroupMedian, raw.streetRate, raw.unitGroupOccupancy,
   );
   const recommendedNewRent = Math.round(raw.currentRent * (1 + percent));
@@ -137,6 +157,7 @@ export function buildTenant(raw: BuildTenantInput): ECRITenant {
     recommendedNewRent,
     recommendedIncrease: recommendedNewRent - raw.currentRent,
     isAboveStreet: recommendedNewRent > raw.streetRate,
+    smartCatchUp: smartCatchUp ?? false,
     isSeasonalLowRate: raw.tenureMonths >= 10 && raw.tenureMonths <= 14
       && (raw.currentRent / raw.unitGroupMedian) < 0.50,
     isMultiUnit: raw.isMultiUnit ?? false,

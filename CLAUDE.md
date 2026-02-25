@@ -81,6 +81,28 @@ When building any component, Claude Code should ask:
 
 If the answer to any of these is wrong, fix it before moving on.
 
+## Color System
+
+All color decisions across ManageSpace modules must use the token system defined in `app/lib/colorSystem.js`. This file is the single source of truth for color.
+
+**Rules Cursor must follow:**
+- Never use raw hex values in components. Always import from `app/lib/colorSystem.js`.
+- Use the exported helper functions for all dynamic coloring:
+  - `getDeltaColor(currentRate, proposedRate)` → increase/decrease delta displays
+  - `getOccupancyColor(occupied, total)` → occupancy indicators and text
+  - `getRatePositionColor(proposedRate, streetRate)` → rate spectrum markers
+  - `getToggleColors(pct)` → rate adjustment toggle buttons (-10, -5, +5, +10)
+  - `getTenureColor(tenureMonths)` → tenure badges
+- If a new color use case arises that isn't covered by the token file, add the token to `colorSystem.js` first, then use it in the component. Never create a one-off color inline.
+- Color communicates two things across this platform: **direction** (positive/negative) and **intensity** (how much it matters). Every new color decision should be evaluated against this principle.
+
+## Component Conventions
+**ECRI UI rebuild plan:** `docs/ecri-ui-rebuild-plan.md` — defines all screens, components, state model, and API contract. Read this before building any ECRI screen or component.
+- ECRI tenant review card: `app/components/ECRITenantCard.jsx`
+- Cards are the primary review unit — one tenant at a time, not tables
+- Toggle buttons (-10%, -5%, +5%, +10%) always use `getToggleColors` and show color at rest, not just on hover
+- Occupancy always displays as X / Y format with a colored dot indicator, never just a percentage
+- Increase history is collapsed by default behind a badge, expanded on click
 ---
 
 ## MODULE 1: COMMUNICATIONS HUB (Demo-Ready)
