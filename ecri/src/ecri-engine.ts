@@ -3,6 +3,8 @@
 // Validated 29/29 against Brian's Cornelius Excel (Feb 12, 2026)
 // ═══════════════════════════════════════════════════════
 
+import { computeChurnProbability } from './forecast-engine';
+
 export interface Competitor {
   name: string;
   quality: 'A' | 'B' | 'C' | 'D';
@@ -49,6 +51,10 @@ export interface ECRITenant {
   dmNotes?: string;
   previousIncreases: { date: string; amount: number }[];
   competitors: Competitor[];
+  // Churn forecast (computed by forecast-engine)
+  churnProbability: number;
+  churnRisk: 'low' | 'medium' | 'high' | 'very-high';
+  netMonthlyImpact: number;
 }
 
 export interface TierResult {
@@ -147,7 +153,8 @@ export function buildTenant(raw: BuildTenantInput): ECRITenant {
     raw.currentRent, raw.unitGroupMedian, raw.streetRate, raw.unitGroupOccupancy,
   );
   const recommendedNewRent = Math.round(raw.currentRent * (1 + percent));
-  return {
+  // Build base tenant first (without churn — needs the full object to compute)
+  const tenant: ECRITenant = {
     ...raw,
     trialRate,
     newRateDeltaToMedian: deltaMed,
@@ -166,5 +173,14 @@ export function buildTenant(raw: BuildTenantInput): ECRITenant {
     status: 'pending',
     previousIncreases: raw.previousIncreases ?? [],
     competitors: raw.competitors ?? [],
+    churnProbability: 0,
+    churnRisk: 'low',
+    netMonthlyImpact: 0,
   };
+  // Now compute churn forecast with the full tenant object
+  const churn = computeChurnProbability(tenant);
+  tenant.churnProbability = churn.churnProbability;
+  tenant.churnRisk = churn.churnRisk;
+  tenant.netMonthlyImpact = churn.netMonthlyImpact;
+  return tenant;
 }

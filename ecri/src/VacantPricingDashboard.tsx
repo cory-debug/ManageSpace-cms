@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Label } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Label } from 'recharts';
 import {
   type VPUnitGroup, type VPFacility, type VPCompetitor, type PriceChange, type NonStorageUnit,
   recommendStreetRate, checkHierarchyViolations, get90DayTrend,
@@ -501,6 +501,7 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
   const [showDmSummary, setShowDmSummary] = useState(false);
   const [dmCopied, setDmCopied] = useState(false);
   const [chartOpen, setChartOpen] = useState(true);
+  const [chartView, setChartView] = useState<'sfRate' | 'gpr'>('sfRate');
   const [activityOpen, setActivityOpen] = useState(true);
   const [facilityNotes, setFacilityNotes] = useState<Record<string, string>>(saved?.facilityNotes || {});
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
@@ -721,10 +722,14 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
   // ── Chart axis domains (tight to data) ──
   const chartDomains = useMemo(() => {
     const h = selectedFacility.monthlyHistory;
-    if (h.length === 0) return { occ: [70, 100] as [number, number], rate: [50, 200] as [number, number] };
+    if (h.length === 0) return {
+      occ: [70, 100] as [number, number], rate: [50, 200] as [number, number],
+      gpr: [60000, 115000] as [number, number],
+    };
 
     let occMin = Infinity, occMax = -Infinity;
     let rateMin = Infinity, rateMax = -Infinity;
+    let gprMin = Infinity, gprMax = -Infinity;
     for (const pt of h) {
       if (pt.occupancyPct < occMin) occMin = pt.occupancyPct;
       if (pt.occupancyPct > occMax) occMax = pt.occupancyPct;
@@ -732,17 +737,23 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
       if (pt.achievedRate < rateMin) rateMin = pt.achievedRate;
       if (pt.streetRate > rateMax) rateMax = pt.streetRate;
       if (pt.achievedRate > rateMax) rateMax = pt.achievedRate;
+      if (pt.grossPotential < gprMin) gprMin = pt.grossPotential;
+      if (pt.projectedRent < gprMin) gprMin = pt.projectedRent;
+      if (pt.grossPotential > gprMax) gprMax = pt.grossPotential;
+      if (pt.projectedRent > gprMax) gprMax = pt.projectedRent;
     }
 
-    // Round down/up to nice increments with padding
     const occFloor = Math.floor((occMin - 2) / 5) * 5;
     const occCeil = Math.min(100, Math.ceil((occMax + 2) / 5) * 5);
     const rateFloor = Math.floor((rateMin - 5) / 10) * 10;
     const rateCeil = Math.ceil((rateMax + 5) / 10) * 10;
+    const gprFloor = Math.floor((gprMin - 2000) / 5000) * 5000;
+    const gprCeil = Math.ceil((gprMax + 2000) / 5000) * 5000;
 
     return {
       occ: [Math.max(0, occFloor), occCeil] as [number, number],
       rate: [Math.max(0, rateFloor), rateCeil] as [number, number],
+      gpr: [Math.max(0, gprFloor), gprCeil] as [number, number],
     };
   }, [selectedFacility]);
 
@@ -1353,7 +1364,7 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
             </div>
           )}
 
-          {/* ════ SECTION A: STORE HEALTH CHART ════ */}
+          {/* ════ SECTION A: STORE HEALTH CHARTS (Morningstar-style) ════ */}
           <div style={{
             background: C.card, borderRadius: 10,
             border: `1px solid ${C.border}`, marginBottom: 16, overflow: 'hidden',
@@ -1364,73 +1375,126 @@ export default function VacantPricingDashboard({ selectedFacilityId, onSelectFac
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 10, color: C.textMuted }}>{chartOpen ? '▼' : '▶'}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>Store Health — 3 Year Trend</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+                  {chartView === 'sfRate' ? 'SF Rate / Occ' : 'GPR / Proj Rent'} — {selectedFacility.name}
+                </span>
               </div>
-              {!chartOpen && seasonComparison && (
-                <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
-                  <span style={{ color: C.textMuted }}>
-                    Occ <strong style={{ color: occColor(seasonComparison.current.occupancyPct) }}>{seasonComparison.current.occupancyPct}%</strong>
-                  </span>
-                  <span style={{ color: C.textMuted }}>
-                    YoY <strong style={{ color: seasonComparison.deltaOcc > 0 ? C.positive : seasonComparison.deltaOcc < 0 ? C.negative : C.textMuted }}>
-                      {seasonComparison.deltaOcc > 0 ? '+' : ''}{seasonComparison.deltaOcc}pp
-                    </strong>
-                  </span>
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
+                {chartOpen && (
+                  <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                    {(['sfRate', 'gpr'] as const).map(v => (
+                      <button key={v} onClick={() => setChartView(v)}
+                        style={{
+                          padding: '4px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
+                          background: chartView === v ? C.activeNav : 'transparent',
+                          color: chartView === v ? '#fff' : C.textSecondary,
+                        }}>
+                        {v === 'sfRate' ? 'SF Rate / Occ' : 'GPR / Proj Rent'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!chartOpen && seasonComparison && (
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
+                    <span style={{ color: C.textMuted }}>
+                      Occ <strong style={{ color: occColor(seasonComparison.current.occupancyPct) }}>{seasonComparison.current.occupancyPct}%</strong>
+                    </span>
+                    <span style={{ color: C.textMuted }}>
+                      YoY <strong style={{ color: seasonComparison.deltaOcc > 0 ? C.positive : seasonComparison.deltaOcc < 0 ? C.negative : C.textMuted }}>
+                        {seasonComparison.deltaOcc > 0 ? '+' : ''}{seasonComparison.deltaOcc}pp
+                      </strong>
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             {chartOpen && <div style={{ padding: '0 16px 16px' }}>
-            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted, marginBottom: 8 }}>
-              <span><span style={{ color: C.info }}>━━</span> Occupancy %</span>
-              <span><span style={{ color: C.warning }}>╌╌</span> Street Rate</span>
-              <span><span style={{ color: C.positive }}>╌╌</span> Achieved Rate</span>
-            </div>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={selectedFacility.monthlyHistory} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
-                <XAxis dataKey="month" tick={{ fontSize: 9, fill: C.textMuted }} interval={5} />
-                <YAxis
-                  yAxisId="pct"
-                  domain={chartDomains.occ}
-                  tick={{ fontSize: 9, fill: C.info }}
-                  tickFormatter={(v: number) => `${v}%`}
-                  width={42}
-                >
-                  <Label
-                    value="Occupancy"
-                    angle={-90}
-                    position="insideLeft"
-                    offset={4}
-                    style={{ fontSize: 10, fontWeight: 600, fill: C.info, textAnchor: 'middle' }}
+
+            {/* ── Chart 1: SF Rate / Occ ── */}
+            {chartView === 'sfRate' && (<>
+              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted, marginBottom: 8 }}>
+                <span><span style={{ display: 'inline-block', width: 16, height: 3, background: '#E87722', borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> Street Rate SF</span>
+                <span><span style={{ display: 'inline-block', width: 16, height: 3, background: C.info, borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> Achieved Rate SF</span>
+                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#D4D0C8', borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> EOM SFO%</span>
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={selectedFacility.monthlyHistory} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 8, fill: C.textMuted }} interval={4} angle={-45} textAnchor="end" height={40} />
+                  <YAxis
+                    yAxisId="pct"
+                    domain={chartDomains.occ}
+                    tick={{ fontSize: 9, fill: C.textMuted }}
+                    tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+                    width={48}
                   />
-                </YAxis>
-                <YAxis
-                  yAxisId="rate"
-                  orientation="right"
-                  domain={chartDomains.rate}
-                  tick={{ fontSize: 9, fill: C.warning }}
-                  tickFormatter={(v: number) => `$${v}`}
-                  width={48}
-                >
-                  <Label
-                    value="Rate ($)"
-                    angle={90}
-                    position="insideRight"
-                    offset={4}
-                    style={{ fontSize: 10, fontWeight: 600, fill: C.warning, textAnchor: 'middle' }}
+                  <YAxis
+                    yAxisId="rate"
+                    orientation="right"
+                    domain={chartDomains.rate}
+                    tick={{ fontSize: 9, fill: C.textMuted }}
+                    tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+                    width={52}
+                  >
+                    <Label
+                      value="Street Rate SF / Achieved Rate SF"
+                      angle={90}
+                      position="insideRight"
+                      offset={8}
+                      style={{ fontSize: 9, fill: C.textMuted, textAnchor: 'middle' }}
+                    />
+                  </YAxis>
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 6, border: `1px solid ${C.border}` }}
+                    labelStyle={{ fontWeight: 600 }}
+                    formatter={(value: number, name: string) =>
+                      name === 'EOM SFO%' ? [`${value.toFixed(1)}%`, name] : [`$${value}`, name]
+                    }
                   />
-                </YAxis>
-                <Tooltip
-                  contentStyle={{ fontSize: 12, borderRadius: 6, border: `1px solid ${C.border}` }}
-                  labelStyle={{ fontWeight: 600 }}
-                  formatter={(value: number, name: string) =>
-                    name === 'Occupancy %' ? [`${value.toFixed(1)}%`, name] : [`$${value}`, name]
-                  }
-                />
-                <Line yAxisId="pct" dataKey="occupancyPct" stroke={C.info} strokeWidth={2.5} dot={false} name="Occupancy %" />
-                <Line yAxisId="rate" dataKey="streetRate" stroke={C.warning} strokeWidth={1.5} dot={false} name="Street Rate" strokeDasharray="6 3" />
-                <Line yAxisId="rate" dataKey="achievedRate" stroke={C.positive} strokeWidth={1.5} dot={false} name="Achieved Rate" strokeDasharray="6 3" />
-              </LineChart>
-            </ResponsiveContainer>
+                  <Bar yAxisId="pct" dataKey="occupancyPct" fill="#D4D0C8" barSize={8} name="EOM SFO%" radius={[1, 1, 0, 0]} />
+                  <Line yAxisId="rate" dataKey="streetRate" stroke="#E87722" strokeWidth={2} dot={false} name="Street Rate SF" />
+                  <Line yAxisId="rate" dataKey="achievedRate" stroke={C.info} strokeWidth={2} dot={false} name="Achieved Rate SF" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </>)}
+
+            {/* ── Chart 2: GPR / Projected Rent ── */}
+            {chartView === 'gpr' && (<>
+              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: C.textMuted, marginBottom: 8 }}>
+                <span><span style={{ display: 'inline-block', width: 16, height: 3, background: '#E87722', borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> Gross Potential</span>
+                <span><span style={{ display: 'inline-block', width: 16, height: 3, background: C.info, borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> EOM Projected Rent</span>
+                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#D4D0C8', borderRadius: 1, verticalAlign: 'middle', marginRight: 4 }} /> EOM Occupancy % (Unit)</span>
+              </div>
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={selectedFacility.monthlyHistory} margin={{ top: 5, right: 16, left: 8, bottom: 5 }}>
+                  <XAxis dataKey="month" tick={{ fontSize: 8, fill: C.textMuted }} interval={4} angle={-45} textAnchor="end" height={40} />
+                  <YAxis
+                    yAxisId="dollar"
+                    domain={chartDomains.gpr}
+                    tick={{ fontSize: 9, fill: C.textMuted }}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                    width={52}
+                  />
+                  <YAxis
+                    yAxisId="pct"
+                    orientation="right"
+                    domain={chartDomains.occ}
+                    tick={{ fontSize: 9, fill: C.textMuted }}
+                    tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+                    width={48}
+                  />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 6, border: `1px solid ${C.border}` }}
+                    labelStyle={{ fontWeight: 600 }}
+                    formatter={(value: number, name: string) =>
+                      name === 'EOM Occupancy %' ? [`${value.toFixed(1)}%`, name] : [`$${value.toLocaleString()}`, name]
+                    }
+                  />
+                  <Bar yAxisId="pct" dataKey="occupancyPct" fill="#D4D0C8" barSize={8} name="EOM Occupancy %" radius={[1, 1, 0, 0]} />
+                  <Line yAxisId="dollar" dataKey="grossPotential" stroke="#E87722" strokeWidth={2} dot={false} name="Gross Potential" />
+                  <Line yAxisId="dollar" dataKey="projectedRent" stroke={C.info} strokeWidth={2} dot={false} name="EOM Projected Rent" />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </>)}
 
             {/* ── Season-over-Season Comparison ── */}
             {seasonComparison && (

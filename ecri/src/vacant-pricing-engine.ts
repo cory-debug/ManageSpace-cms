@@ -35,6 +35,8 @@ export interface MonthlySnapshot {
   occupancyPct: number;
   streetRate: number;
   achievedRate: number;
+  grossPotential: number;
+  projectedRent: number;
 }
 
 export interface VPRecommendation {
@@ -337,10 +339,12 @@ export function generateMonthlyHistory(
   baseOcc: number,
   baseStreet: number,
   baseAchieved: number,
-  months: number = 36,
+  months: number = 56,
 ): MonthlySnapshot[] {
   const result: MonthlySnapshot[] = [];
   const now = new Date(2026, 1, 1); // Feb 2026
+  // Assume ~120 total units for GPR/projected rent calculations
+  const totalUnits = 120;
 
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -362,13 +366,23 @@ export function generateMonthlyHistory(
     const occ = Math.max(55, Math.min(98, baseOcc + seasonal + trend + jitter));
     const street = Math.round(baseStreet * (1 + yearOffset * 0.03) + Math.sin(i * 3.1) * 3);
     const achieved = Math.round(baseAchieved * (1 + yearOffset * 0.025) + Math.sin(i * 2.7) * 4);
+    const safeStreet = Math.max(50, street);
+    const safeAchieved = Math.max(safeStreet + 5, achieved);
+
+    // GPR = street rate * total units (what you'd earn at full occupancy at street rate)
+    const grossPotential = Math.round(safeStreet * totalUnits);
+    // Projected rent = achieved rate * occupied units
+    const occupiedUnits = Math.round(totalUnits * occ / 100);
+    const projectedRent = Math.round(safeAchieved * occupiedUnits);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     result.push({
       month: `${monthNames[monthIdx]} ${d.getFullYear() % 100}`,
       occupancyPct: Math.round(occ * 10) / 10,
-      streetRate: Math.max(50, street),
-      achievedRate: Math.max(street + 5, achieved),
+      streetRate: safeStreet,
+      achievedRate: safeAchieved,
+      grossPotential,
+      projectedRent,
     });
   }
 
